@@ -1,0 +1,44 @@
+{
+  "name": "accounting-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "NEXT_DIST_DIR=.next-dev next dev",
+    "dev:clean": "rm -rf .next-dev && NEXT_DIST_DIR=.next-dev next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "db:push": "prisma db push || npm run db:init",
+    "db:init": "[ -f prisma/dev.db ] || (prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/init.sql && sqlite3 prisma/dev.db < prisma/init.sql)",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:backfill-receipt-transactions": "tsx scripts/backfill-receipt-transactions.ts",
+    "db:reextract-receipts": "tsx scripts/reextract-receipts.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.19.1",
+    "next": "14.2.15",
+    "nodemailer": "^8.0.4",
+    "papaparse": "^5.4.1",
+    "pdf-parse": "^2.4.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "tesseract.js": "^7.0.0",
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "@types/nodemailer": "^8.0.0",
+    "@types/papaparse": "^5.3.16",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "dotenv": "^16.4.5",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.15",
+    "prisma": "^5.19.1",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  }
+}

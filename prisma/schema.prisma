@@ -1,0 +1,258 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id                String       @id @default(cuid())
+  name              String
+  orgType           String       @default("sole_trader")
+  jurisdiction      String       @default("SWEDEN")
+  bookkeepingMethod String       @default("kontantmetoden")
+  vatRegistered     Boolean      @default(true)
+  vatFrequency      String       @default("yearly")
+  fiscalYearStart   DateTime
+  baseCurrency      String       @default("SEK")
+  locale            String       @default("en")
+  invoiceNumberPattern   String   @default("INV-{YYYY}-{SEQ:4}")
+  nextInvoiceSequence    Int      @default(1)
+  invoiceSenderName      String?
+  invoiceSenderAddress   String?
+  invoiceSenderOrgNumber String?
+  invoiceSenderEmail     String?
+  invoiceSenderPhone     String?
+  invoiceSenderWebsite   String?
+  invoiceDefaultLogo     String?
+  invoiceDefaultSignature String?
+  invoiceEmailFrom       String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  taxConfig   TaxConfig?
+  accounts    Account[]
+  receipts    Receipt[]
+  invoices    Invoice[]
+  customers   Customer[]
+  transactions Transaction[]
+  bankImports BankImportBatch[]
+}
+
+model TaxConfig {
+  id                          String   @id @default(cuid())
+  businessId                  String   @unique
+  municipalTaxRate            Decimal  @default(0.32)
+  socialContributionRate      Decimal  @default(0.2897)
+  generalDeductionRate        Decimal  @default(0.25)
+  vatStandardRate             Decimal  @default(0.25)
+  vatReducedRateFood          Decimal  @default(0.12)
+  vatReducedRateCulture       Decimal  @default(0.06)
+  updatedAt                   DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id          String      @id @default(cuid())
+  businessId  String
+  code        String
+  name        String
+  type        String
+  vatCode     String?
+  isSystem    Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  lines    JournalLine[]
+
+  @@unique([businessId, code])
+}
+
+model Receipt {
+  id               String   @id @default(cuid())
+  businessId       String
+  source           String   @default("upload")
+  originalFileName String
+  mimeType         String
+  filePath         String
+  receiptNumber    String?
+  vendor           String?
+  receiptDate      DateTime?
+  grossAmount      Decimal?
+  netAmount        Decimal?
+  vatAmount        Decimal?
+  vatRate          Decimal?
+  currency         String   @default("SEK")
+  sourceCurrency   String?
+  fxRateToSek      Decimal?
+  fxRateDate       DateTime?
+  category         String?
+  confidence       Decimal?
+  needsReview      Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  business      Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  transactions  Transaction[]
+}
+
+model Transaction {
+  id          String               @id @default(cuid())
+  businessId  String
+  receiptId   String?
+  paidInvoiceId String?            @unique
+  txnDate     DateTime
+  description String
+  direction   String
+  grossAmount Decimal
+  netAmount   Decimal
+  vatAmount   Decimal
+  vatRate     Decimal
+  currency    String               @default("SEK")
+  sourceCurrency String?
+  fxRateToSek Decimal?
+  fxRateDate  DateTime?
+  source      String
+  reference   String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  business Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  receipt  Receipt?     @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+  paidInvoice Invoice?  @relation("InvoicePayment", fields: [paidInvoiceId], references: [id], onDelete: SetNull)
+  lines    JournalLine[]
+  bankImportRows BankImportRow[]
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  businessId     String
+  customerId     String?
+  invoiceNumber  String
+  customerName   String
+  customerEmail  String?
+  customerPhone  String?
+  customerWebsite String?
+  customerAddress String?
+  senderName     String?
+  senderAddress  String?
+  senderOrgNumber String?
+  senderEmail    String?
+  senderPhone    String?
+  senderWebsite  String?
+  projectName    String?
+  issueDate      DateTime
+  dueDate        DateTime?
+  description    String?
+  notes          String?
+  paymentMethod  String?
+  paymentDetails String?
+  logoDataUrl    String?
+  signatureDataUrl String?
+  subtotalAmount Decimal  @default(0)
+  vatAmount      Decimal  @default(0)
+  grossAmount    Decimal
+  vatRate        Decimal  @default(0.25)
+  currency       String   @default("SEK")
+  status         String   @default("UNPAID")
+  emailTo        String?
+  sentAt         DateTime?
+  paidAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  business        Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer        Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  paidTransaction Transaction? @relation("InvoicePayment")
+  items           InvoiceItem[]
+
+  @@unique([businessId, invoiceNumber])
+  @@index([businessId, issueDate])
+  @@index([businessId, customerName])
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  businessId   String
+  name         String
+  email        String?
+  phone        String?
+  website      String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  postalCode   String?
+  country      String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@index([businessId, name])
+  @@index([businessId, email])
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  sortOrder   Int      @default(0)
+  description String
+  quantity    Decimal  @default(1)
+  unitPrice   Decimal
+  vatMode     String   @default("NO_VAT")
+  vatRate     Decimal  @default(0)
+  netAmount   Decimal
+  vatAmount   Decimal
+  totalAmount Decimal
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId, sortOrder])
+}
+
+model JournalLine {
+  id            String   @id @default(cuid())
+  transactionId String
+  accountId     String
+  debit         Decimal  @default(0)
+  credit        Decimal  @default(0)
+  note          String?
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  account     Account     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+}
+
+model BankImportBatch {
+  id              String   @id @default(cuid())
+  businessId      String
+  fileName        String
+  importedRows    Int
+  acceptedRows    Int
+  rejectedRows    Int
+  createdAt       DateTime @default(now())
+
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  rows     BankImportRow[]
+}
+
+model BankImportRow {
+  id             String   @id @default(cuid())
+  batchId        String
+  rowNumber      Int
+  txnDate        DateTime
+  description    String
+  amount         Decimal
+  status         String
+  rejectionReason String?
+  transactionId  String?
+
+  batch       BankImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  transaction Transaction?    @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+}

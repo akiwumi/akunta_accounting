@@ -1,0 +1,737 @@
+:root {
+  --bg: #eceef3;
+  --surface: #ffffff;
+  --surface-soft: #f7f8fc;
+  --border: #e2e7f0;
+  --border-strong: #d4dae7;
+  --text: #1f2937;
+  --muted: #64748b;
+  --accent: #2f5bff;
+  --accent-soft: #edf2ff;
+  --good: #1d9445;
+  --warn: #b26a08;
+  --danger: #c33939;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  font-family: "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at 16% 0%, #f7f8fb 0%, var(--bg) 45%, #e7eaf2 100%);
+  line-height: 1.4;
+}
+
+a {
+  color: #2447b2;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+[id] {
+  scroll-margin-top: 92px;
+}
+
+.appShell {
+  width: min(1500px, calc(100vw - 32px));
+  min-height: calc(100vh - 32px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  border: 1px solid var(--border-strong);
+  border-radius: 24px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 24px 46px rgba(15, 23, 42, 0.08);
+}
+
+.sideNav {
+  background: linear-gradient(180deg, #fafbfe 0%, #f4f6fb 100%);
+  border-right: 1px solid var(--border);
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sideNavBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 8px;
+}
+
+.brandMark {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #2f5bff 0%, #3a7bff 100%);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+.brandName {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.96rem;
+}
+
+.brandTagline {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.sideNavSections {
+  display: grid;
+  gap: 10px;
+}
+
+.sideNavGroup {
+  display: grid;
+  gap: 4px;
+}
+
+.sideNavSectionLabel {
+  margin: 8px 8px 6px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sideNavLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 8px 10px;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.sideNavLink:hover {
+  color: var(--text);
+  background: #fff;
+  border-color: #e4e8f2;
+  text-decoration: none;
+}
+
+.sideNavLink.active {
+  color: var(--text);
+  background: #fff;
+  border-color: #d6deef;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.sideNavIcon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: #ebf1ff;
+  color: #2f5bff;
+  display: grid;
+  place-items: center;
+  font-size: 0.66rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.sideNavFooter {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.navLocaleControl {
+  display: grid;
+  gap: 6px;
+}
+
+.navLocaleControl .note {
+  font-size: 0.76rem;
+}
+
+.navLocaleControl select {
+  width: 100%;
+}
+
+.appMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.subNav {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 22px 0;
+}
+
+.subNavMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+
+.subNavTitle {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.subNavTabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+}
+
+.subNavTab {
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 0.87rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.subNavTab:hover {
+  border-color: var(--border);
+  color: var(--text);
+  background: #f8faff;
+  text-decoration: none;
+}
+
+.subNavTab.active {
+  border-color: #d7dff4;
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+.container {
+  max-width: none;
+  margin: 0;
+  padding: 22px 24px 28px;
+}
+
+.page {
+  display: grid;
+  gap: 16px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.62rem;
+  font-weight: 750;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 16px;
+  box-shadow: 0 7px 20px rgba(15, 23, 42, 0.04);
+}
+
+.card h2,
+.card h3 {
+  margin: 0 0 10px;
+}
+
+.kpi {
+  margin: 0;
+  font-size: 1.66rem;
+  font-weight: 760;
+}
+
+.label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tableWrap table {
+  min-width: 720px;
+}
+
+th,
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+th {
+  background: #f8faff;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+}
+
+.badge.warn {
+  color: var(--warn);
+  border-color: #f1d4a5;
+  background: #fff5e8;
+}
+
+.badge.good {
+  color: var(--good);
+  border-color: #a5dec0;
+  background: #effdf4;
+}
+
+.stack {
+  display: grid;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.row > label.stack {
+  flex: 1 1 220px;
+}
+
+.row > label.stack > input,
+.row > label.stack > select,
+.row > label.stack > textarea {
+  width: 100%;
+}
+
+button,
+.button {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+button.secondary,
+.button.secondary {
+  border-color: var(--border);
+  background: #fff;
+  color: var(--text);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: #fff;
+  padding: 9px 10px;
+  color: inherit;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus,
+.button:focus,
+.sideNavLink:focus,
+.subNavTab:focus {
+  outline: 2px solid #8ba6ff;
+  outline-offset: 1px;
+}
+
+pre {
+  margin: 0;
+}
+
+.note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.88rem;
+}
+
+.success {
+  margin: 0;
+  color: var(--good);
+  font-size: 0.88rem;
+}
+
+.invoiceWorkspace {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.invoiceBuilder {
+  display: grid;
+  gap: 12px;
+}
+
+.invoiceBuilder details {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  padding: 0;
+  overflow: hidden;
+}
+
+.invoiceBuilder summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  font-weight: 650;
+  border-bottom: 1px solid var(--border);
+  list-style: none;
+}
+
+.invoiceBuilder details[open] summary {
+  background: #f4f7ff;
+}
+
+.invoiceSectionBody {
+  padding: 12px;
+}
+
+.invoiceCustomerSuggestions {
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.invoiceCustomerOption {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: #fff;
+  color: var(--text);
+  padding: 10px 12px;
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.invoiceCustomerOption:last-child {
+  border-bottom: none;
+}
+
+.invoiceCustomerOption strong {
+  font-size: 0.9rem;
+}
+
+.invoiceCustomerOption span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.invoiceItemCard {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.invoicePreview {
+  position: sticky;
+  top: 76px;
+  display: grid;
+  gap: 12px;
+}
+
+.invoicePreviewActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.invoicePreviewActions h2 {
+  margin: 0;
+}
+
+.invoicePaper {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 22px;
+  display: grid;
+  gap: 16px;
+}
+
+.invoicePaperHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.invoicePaperHeader h3 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.invoicePaperHeader p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.invoiceLogo {
+  max-height: 56px;
+  max-width: 180px;
+  object-fit: contain;
+}
+
+.invoiceMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+}
+
+.invoiceMetaGrid p {
+  margin: 0;
+}
+
+.invoicePartyGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.invoicePartyGrid p {
+  margin: 0 0 2px;
+}
+
+.invoiceTotals {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.invoiceTotals p {
+  margin: 0;
+}
+
+.invoiceNote {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  margin: 0;
+  background: #fafcff;
+}
+
+.invoicePayment h4 {
+  margin: 0 0 6px;
+}
+
+.invoicePayment p {
+  margin: 0 0 2px;
+}
+
+.invoiceSignatureRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.invoiceSignature {
+  max-height: 44px;
+  max-width: 180px;
+  object-fit: contain;
+}
+
+@media (max-width: 1040px) {
+  .appShell {
+    grid-template-columns: 84px minmax(0, 1fr);
+  }
+
+  .invoiceWorkspace {
+    grid-template-columns: 1fr;
+  }
+
+  .invoicePreview {
+    position: static;
+  }
+
+  .brandCopy,
+  .sideNavSectionLabel,
+  .sideNavLinkText,
+  .navLocaleControl .note {
+    display: none;
+  }
+
+  .sideNavLink {
+    justify-content: center;
+    padding: 8px;
+  }
+
+  .sideNavFooter {
+    display: flex;
+    justify-content: center;
+  }
+
+  .navLocaleControl select {
+    width: 68px;
+    min-width: 68px;
+  }
+}
+
+@media (max-width: 760px) {
+  body {
+    padding: 0;
+  }
+
+  .appShell {
+    width: 100%;
+    min-height: 100vh;
+    border-radius: 0;
+    border: none;
+    margin: 0;
+    box-shadow: none;
+    grid-template-columns: 1fr;
+  }
+
+  .sideNav {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    overflow-x: auto;
+  }
+
+  .sideNavSections {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .sideNavGroup {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .sideNavFooter {
+    margin-top: 0;
+    border-top: none;
+    padding-top: 0;
+  }
+
+  .subNav {
+    position: static;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .container {
+    padding: 16px;
+  }
+
+  .title {
+    font-size: 1.4rem;
+  }
+
+  .invoiceMetaGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .invoicePartyGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .tableWrap table {
+    min-width: 620px;
+  }
+}
