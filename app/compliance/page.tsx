@@ -307,19 +307,19 @@ export default async function CompliancePage() {
       <div className="grid">
         <article className="card">
           <p className="label">{sv ? "Klara krav" : "Complete"}</p>
-          <p className="kpi" style={{ color: "#155724" }}>
+          <p className="kpi" style={{ color: "var(--secondary)" }}>
             {checks.filter((c) => c.status === "ok").length} / {checks.length}
           </p>
         </article>
         <article className="card">
           <p className="label">{sv ? "Saknas / åtgärdas" : "Missing / Action needed"}</p>
-          <p className="kpi" style={{ color: "#721c24" }}>
+          <p className="kpi" style={{ color: "var(--error)" }}>
             {checks.filter((c) => c.status === "warn").length}
           </p>
         </article>
         <article className="card">
           <p className="label">{sv ? "Notera" : "For information"}</p>
-          <p className="kpi" style={{ color: "#0c5460" }}>
+          <p className="kpi" style={{ color: "var(--primary)" }}>
             {checks.filter((c) => c.status === "info").length}
           </p>
         </article>
@@ -342,7 +342,7 @@ export default async function CompliancePage() {
                     padding: "0.75rem",
                     borderRadius: 6,
                     background: statusBg(check.status),
-                    border: `1px solid ${statusColor(check.status)}22`
+                    boxShadow: "0 24px 36px var(--ambient-shadow-soft)"
                   }}
                 >
                   <span
@@ -353,8 +353,7 @@ export default async function CompliancePage() {
                       fontSize: "0.75em",
                       fontWeight: 700,
                       background: statusBg(check.status),
-                      color: statusColor(check.status),
-                      border: `1px solid ${statusColor(check.status)}`
+                      color: statusColor(check.status)
                     }}
                   >
                     {statusLabel(check.status)}

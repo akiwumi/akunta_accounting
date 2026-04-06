@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import { type Locale } from "@/lib/i18n/locale";
@@ -28,25 +29,28 @@ const links = [
 
 const copy = {
   en: {
-    main: "Bookkeeping",
+    main: "",
     tax: "Swedish Tax",
     other: "Other",
     language: "Language",
     english: "English",
-    swedish: "Swedish"
+    swedish: "Swedish",
+    logout: "Log out"
   },
   sv: {
-    main: "Bokföring",
+    main: "",
     tax: "Skatteunderlag",
     other: "Övrigt",
     language: "Språk",
     english: "Engelska",
-    swedish: "Svenska"
+    swedish: "Svenska",
+    logout: "Logga ut"
   }
 } as const;
 
 export const AppNav = ({ locale }: { locale: Locale }) => {
   const pathname = usePathname() || "/";
+  const router = useRouter();
   const labels = copy[locale];
 
   const isActiveLink = (href: string) => {
@@ -60,21 +64,22 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
     { key: "other", label: labels.other }
   ];
 
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  };
+
   return (
     <aside className="sideNav">
       <div className="sideNavBrand">
-        <div className="brandMark" aria-hidden>
-          N
-        </div>
-        <div className="brandCopy">
-          <p className="brandName">NorthLedger</p>
-          <p className="brandTagline">Business Accounting</p>
-        </div>
+        <Image src="/akunta_logo.png" alt="Akunta" width={610} height={614} className="brandLogoFull" priority />
+        <p className="brandSubline">Bookkeeping Accounting</p>
       </div>
       <div className="sideNavSections">
         {groups.map(({ key, label }) => (
           <div className="sideNavGroup" key={key}>
-            <p className="sideNavSectionLabel">{label}</p>
+            {label ? <p className="sideNavSectionLabel">{label}</p> : null}
             {links
               .filter((link) => link.group === key)
               .map((link) => (
@@ -99,6 +104,9 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
           englishLabel={labels.english}
           swedishLabel={labels.swedish}
         />
+        <button type="button" className="secondary navLogoutButton" onClick={logout}>
+          {labels.logout}
+        </button>
       </div>
     </aside>
   );
