@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { InvoicesManager } from "@/components/invoices/InvoicesManager";
 import { SectionExportBar } from "@/components/layout/SectionExportBar";
 import { asNumber } from "@/lib/accounting/math";

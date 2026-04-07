@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { MileageLog } from "@/components/mileage/MileageLog";
 import { ensureBusiness } from "@/lib/data/business";
 import { prisma } from "@/lib/db";

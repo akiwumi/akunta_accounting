@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { BankImportForm } from "@/components/forms/BankImportForm";
 import { SectionExportBar } from "@/components/layout/SectionExportBar";
 import { ensureBusiness } from "@/lib/data/business";

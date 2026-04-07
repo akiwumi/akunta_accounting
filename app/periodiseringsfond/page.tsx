@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { PeriodiseringsfondManager } from "@/components/compliance/PeriodiseringsfondManager";
 import { ensureBusiness } from "@/lib/data/business";
 import { prisma } from "@/lib/db";

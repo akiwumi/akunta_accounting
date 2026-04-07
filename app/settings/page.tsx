@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { SettingsForm } from "@/components/forms/SettingsForm";
 import { SectionExportBar } from "@/components/layout/SectionExportBar";
 import { asNumber } from "@/lib/accounting/math";

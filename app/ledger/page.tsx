@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { LedgerTransactionsTable } from "@/components/ledger/LedgerTransactionsTable";
 import { SectionExportBar } from "@/components/layout/SectionExportBar";
 import { asNumber } from "@/lib/accounting/math";

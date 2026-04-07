@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { ensureBusiness } from "@/lib/data/business";
 import { prisma } from "@/lib/db";
 import { getRequestLocale } from "@/lib/i18n/locale";

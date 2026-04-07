@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { ReportsRunner } from "@/components/reports/ReportsRunner";
 import { ensureBusiness } from "@/lib/data/business";
 import { getFiscalYearStartMonth, parseTaxYear } from "@/lib/data/period";

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { buildDashboardSummary } from "@/lib/accounting/reports";
 import { SectionExportBar } from "@/components/layout/SectionExportBar";
 import { fiscalYearPeriod, formatTaxYearLabel, getFiscalYearStartMonth, parseTaxYear } from "@/lib/data/period";

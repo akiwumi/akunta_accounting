@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { SalariesManager } from "@/components/salaries/SalariesManager";
 import { SectionExportBar } from "@/components/layout/SectionExportBar";
 import { asNumber, round2 } from "@/lib/accounting/math";

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { ManualReceiptForm } from "@/components/forms/ManualReceiptForm";
 import { ReceiptUploadForm } from "@/components/forms/ReceiptUploadForm";
 import { SectionExportBar } from "@/components/layout/SectionExportBar";
