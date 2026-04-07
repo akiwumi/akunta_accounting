@@ -946,6 +946,7 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
                 <input type="file" accept="image/*" onChange={(event) => onImageSelect(event, setLogoDataUrl)} />
                 {logoDataUrl && (
                   <div className="row">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={logoDataUrl} alt="Invoice logo" style={{ maxHeight: 38 }} />
                     <button type="button" className="secondary" onClick={() => setLogoDataUrl("")}>
                       {copy.clearImage}
@@ -958,6 +959,7 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
                 <input type="file" accept="image/*" onChange={(event) => onImageSelect(event, setSignatureDataUrl)} />
                 {signatureDataUrl && (
                   <div className="row">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={signatureDataUrl} alt="Invoice signature" style={{ maxHeight: 38 }} />
                     <button type="button" className="secondary" onClick={() => setSignatureDataUrl("")}>
                       {copy.clearImage}
@@ -1013,6 +1015,7 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
                 <h3>Invoice</h3>
                 <p>#{invoiceNumber || "-"}</p>
               </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               {logoDataUrl ? <img className="invoiceLogo" src={logoDataUrl} alt="Invoice logo" /> : null}
             </div>
 
@@ -1104,6 +1107,7 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
 
             {signatureDataUrl && (
               <div className="invoiceSignatureRow">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="invoiceSignature" src={signatureDataUrl} alt="Invoice signature" />
               </div>
             )}

@@ -508,6 +508,7 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
           <input type="file" accept="image/*" onChange={(event) => onImageSelect(event, setInvoiceDefaultLogo)} />
           {invoiceDefaultLogo ? (
             <div className="row">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={invoiceDefaultLogo} alt="Invoice logo preview" style={{ maxHeight: 42 }} />
               <button type="button" className="secondary" onClick={() => setInvoiceDefaultLogo("")}>
                 {copy.clearImage}
@@ -527,6 +528,7 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
           />
           {invoiceDefaultSignature ? (
             <div className="row">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={invoiceDefaultSignature} alt="Invoice signature preview" style={{ maxHeight: 42 }} />
               <button type="button" className="secondary" onClick={() => setInvoiceDefaultSignature("")}>
                 {copy.clearImage}
