@@ -10,12 +10,14 @@ const PUBLIC_API_ROUTES = [
   "/api/auth/login",
   "/api/auth/logout",
   "/api/auth/register",
+  "/api/auth/verify",
+  "/api/settings/locale",
   "/api/health",
   "/api/support"
 ];
 
 // Public site routes — no session required, available to anyone
-const PUBLIC_SITE_PREFIXES = ["/", "/blog", "/help", "/support", "/resources"];
+const PUBLIC_SITE_PREFIXES = ["/", "/blog", "/help", "/support", "/resources", "/pricing", "/welcome"];
 
 function isAuthRoute(pathname: string): boolean {
   return AUTH_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));

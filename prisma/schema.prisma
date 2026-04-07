@@ -10,14 +10,16 @@ datasource db {
 // ─── Auth & Tenancy ─────────────────────────────────────────────────────────
 
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  passwordHash   String?
-  fullName       String?
-  bankIdSubject  String?  @unique
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                      String    @id @default(cuid())
+  email                   String    @unique
+  passwordHash            String?
+  fullName                String?
+  bankIdSubject           String?   @unique
+  isActive                Boolean   @default(true)
+  emailVerificationToken  String?   @unique
+  emailVerifiedAt         DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   memberships   Membership[]
   sessions      Session[]

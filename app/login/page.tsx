@@ -1,50 +1,43 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-
-const SPLASH_TITLE = "Akunta";
-const SUBTITLE = "Bookkeeping Accounting";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"splash" | "login">("splash");
-  const [username, setUsername] = useState("owner@akunta.app");
+  const searchParams = useSearchParams();
+  const errorParam = searchParams.get("error");
+
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    errorParam === "invalid_token" ? "That verification link is invalid or has expired." :
+    errorParam === "no_business"   ? "Account setup incomplete. Please contact support." : null
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
 
-  const openLogin = () => {
-    setStep("login");
-    setError(null);
-  };
-
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setError(null);
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username: email, password })
       });
-
-      const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) {
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
         setError(payload.error ?? "Login failed.");
         setIsSubmitting(false);
         return;
       }
-
       setIsLeaving(true);
-      setTimeout(() => {
-        router.replace("/dashboard");
-        router.refresh();
-      }, 340);
+      setTimeout(() => { router.replace("/dashboard"); router.refresh(); }, 340);
     } catch {
       setError("Unable to connect. Please try again.");
       setIsSubmitting(false);
@@ -55,84 +48,54 @@ export default function LoginPage() {
     <section className={`authScreen${isLeaving ? " authScreenLeaving" : ""}`}>
       <div className="authBackdropGlow" aria-hidden />
 
-      {step === "splash" ? (
-        <div className="splashStage">
-          <button
-            type="button"
-            className="splashLogoButton"
-            onClick={openLogin}
-            aria-label="Open login form"
-          >
-            <Image
-              src="/akunta_logo.png"
-              alt="Akunta logo"
-              width={610}
-              height={614}
-              className="splashLogo"
-              priority
+      <div className="loginStage routeFade">
+        <div className="loginBrand">
+          <Image src="/akunta_logo.png" alt="Akunta logo" width={610} height={614} className="loginBrandLogo" priority />
+          <h1 className="splashTitle">Akunta</h1>
+          <p className="splashSubtitle">Bookkeeping Accounting</p>
+        </div>
+
+        <form className="loginCard" onSubmit={onSubmit}>
+          <h2>Sign in</h2>
+          <p className="note">Open your accounting workspace.</p>
+
+          <label className="stack">
+            Email
+            <input
+              type="email"
+              autoComplete="username"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
             />
+          </label>
+
+          <label className="stack">
+            Password
+            <input
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+
+          {error && <p className="error">{error}</p>}
+
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Signing in…" : "Sign in"}
           </button>
-          <h1 className="splashTitle">{SPLASH_TITLE}</h1>
-          <p className="splashSubtitle">{SUBTITLE}</p>
-          <p className="splashHint">Click the logo to sign in</p>
-        </div>
-      ) : (
-        <div className="loginStage routeFade">
-          <div className="loginBrand">
-            <Image
-              src="/akunta_logo.png"
-              alt="Akunta logo"
-              width={610}
-              height={614}
-              className="loginBrandLogo"
-              priority
-            />
-            <h1 className="splashTitle">{SPLASH_TITLE}</h1>
-            <p className="splashSubtitle">{SUBTITLE}</p>
-          </div>
 
-          <form className="loginCard" onSubmit={onSubmit}>
-            <h2>Login</h2>
-            <p className="note">Sign in to open your accounting workspace.</p>
+          <p className="authAltLine">
+            Don&apos;t have an account?{" "}
+            <Link href="/register" className="textLink">Create one</Link>
+          </p>
 
-            <label className="stack">
-              Email
-              <input
-                autoComplete="username"
-                required
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-              />
-            </label>
-
-            <label className="stack">
-              Password
-              <input
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </label>
-
-            {error ? <p className="error">{error}</p> : null}
-
-            <button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Signing in..." : "Sign in"}
-            </button>
-
-            <button
-              type="button"
-              className="button tertiary"
-              disabled={isSubmitting}
-              onClick={() => setStep("splash")}
-            >
-              Back to splash
-            </button>
-          </form>
-        </div>
-      )}
+          <Link href="/" className="authBackLink">← Back to home</Link>
+        </form>
+      </div>
     </section>
   );
 }

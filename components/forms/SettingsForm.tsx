@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Jurisdictions, type Jurisdiction } from "@/lib/domain/enums";
 import { type Locale } from "@/lib/i18n/locale";
+import { HintTip } from "@/components/ui/HintTip";
 
 type SettingsFormProps = {
   locale: Locale;
@@ -207,6 +208,16 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Hints preference — read/write via cookie
+  const [hintsOn, setHintsOn] = useState(true);
+  useEffect(() => {
+    setHintsOn(!document.cookie.split(";").some((c) => c.trim() === "hints=off"));
+  }, []);
+  const toggleHints = (on: boolean) => {
+    setHintsOn(on);
+    document.cookie = `hints=${on ? "on" : "off"}; path=/; max-age=31536000; samesite=lax`;
+  };
+
   const onImageSelect = async (
     event: React.ChangeEvent<HTMLInputElement>,
     setter: (value: string) => void
@@ -276,15 +287,8 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
         throw new Error(json?.error ?? fallback);
       }
 
-      try {
-        await fetch("/api/locale", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ locale })
-        });
-      } catch {
-        // Locale cookie update is non-critical for settings persistence.
-      }
+      // Sync locale cookie so the UI updates without a full reload
+      document.cookie = `locale=${locale}; path=/; max-age=31536000; samesite=lax`;
 
       setSuccess(json?.savedLocally ? copy.savedLocalOnly : copy.saved);
     } catch (saveError) {
@@ -384,7 +388,7 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
               </option>
             ))}
           </select>
-          <span className="note">{copy.taxYearHint}</span>
+          <HintTip text={copy.taxYearHint} />
         </label>
 
         <label className="stack">
@@ -405,7 +409,7 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
             placeholder="62010"
             maxLength={10}
           />
-          <span className="note">{copy.sniCodeHint}</span>
+          <HintTip text={copy.sniCodeHint} />
         </label>
 
         <label className="stack">
@@ -416,7 +420,7 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
             placeholder="SE123456789001"
             maxLength={30}
           />
-          <span className="note">{copy.vatNumberHint}</span>
+          <HintTip text={copy.vatNumberHint} />
         </label>
       </div>
 
@@ -430,7 +434,7 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
             <option value="yes">{copy.yes}</option>
             <option value="no">{copy.no}</option>
           </select>
-          <span className="note">{copy.fSkattHint}</span>
+          <HintTip text={copy.fSkattHint} />
         </label>
 
         <label className="stack">
@@ -442,7 +446,7 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
             maxLength={20}
             autoComplete="off"
           />
-          <span className="note">{copy.personnummerHint}</span>
+          <HintTip text={copy.personnummerHint} />
         </label>
       </div>
 
@@ -456,7 +460,7 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
           onChange={(event) => setInvoiceNumberPattern(event.target.value)}
           placeholder="INV-{YYYY}-{SEQ:4}"
         />
-        <span className="note">{copy.numberingHint}</span>
+        <HintTip text={copy.numberingHint} />
       </label>
 
       <div className="row">
@@ -580,6 +584,23 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
             onChange={(event) => setGeneralDeductionRate(Number(event.target.value))}
           />
         </label>
+      </div>
+
+      {/* ── Help hints preference ───────────────────────────────────── */}
+      <div className="hintsToggleRow">
+        <span className="hintsToggleLabel">
+          {uiLocale === "sv" ? "Visa hjälptips i formulär" : "Show help hints in forms"}
+        </span>
+        <button
+          type="button"
+          className={`hintsToggleBtn${hintsOn ? " hintsToggleBtnOn" : ""}`}
+          onClick={() => toggleHints(!hintsOn)}
+          aria-pressed={hintsOn}
+        >
+          {hintsOn
+            ? (uiLocale === "sv" ? "På" : "On")
+            : (uiLocale === "sv" ? "Av" : "Off")}
+        </button>
       </div>
 
       <div className="row">
