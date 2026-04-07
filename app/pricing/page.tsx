@@ -28,8 +28,8 @@ const PLANS = [
     nameSv: "Akunta",
     tagline: "Everything included. One simple price.",
     taglineSv: "Allt ingår. Ett enkelt pris.",
-    monthlyPrice: 300,
-    annualPrice: 3000, // 10 months — 2 months free
+    monthlyPrice: 125,
+    annualPrice: 1250, // 2 months free
     currency: "SEK",
     highlighted: true
   }
@@ -73,6 +73,10 @@ export default function PricingPage() {
           {
             q: "Vad händer om jag vill avsluta?",
             a: "Du kan avsluta när som helst i dina kontoinställningar. Du behåller åtkomst till din data ut innevarande period."
+          },
+          {
+            q: "Finns det återbetalningar?",
+            a: "Nej, vi erbjuder inga återbetalningar. Men vi gör alltid vårt bästa för att lösa eventuella problem som uppstår."
           }
         ]
       }
@@ -107,6 +111,10 @@ export default function PricingPage() {
           {
             q: "What happens if I cancel?",
             a: "Cancel any time in your account settings. You keep access until the end of your billing period."
+          },
+          {
+            q: "Are there refunds?",
+            a: "No, we do not offer refunds. However, we will always do our best to resolve any problems that occur."
           }
         ]
       };
