@@ -63,6 +63,10 @@ export default function PricingPage() {
             a: "Ja, du kan uppgradera eller nedgradera när som helst. Fakturering justeras proportionellt."
           },
           {
+            q: "Finns det en gratis provperiod?",
+            a: "Ja, alla betalplaner har 7 dagars gratis provperiod. Du kan avbryta när som helst innan provperioden löper ut och debiteras då inte."
+          },
+          {
             q: "Finns det bindningstid?",
             a: "Nej. Månadsprenumerationer förnyas varje månad. Årsplaner löper ett år och förnyas sedan automatiskt."
           },
@@ -99,6 +103,10 @@ export default function PricingPage() {
           {
             q: "Can I switch plans?",
             a: "Yes, you can upgrade or downgrade at any time. Billing is adjusted pro-rata."
+          },
+          {
+            q: "Is there a free trial?",
+            a: "Yes, all paid plans include a 7-day free trial. You can cancel any time before the trial ends and you will not be charged."
           },
           {
             q: "Is there a minimum commitment?",

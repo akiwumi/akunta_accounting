@@ -45,7 +45,10 @@ export async function POST(request: Request) {
       success_url: successUrl ?? `${appUrl}/settings/billing?success=1`,
       cancel_url: cancelUrl ?? `${appUrl}/settings/billing?cancelled=1`,
       metadata: { businessId, plan },
-      subscription_data: { metadata: { businessId, plan } },
+      subscription_data: {
+        metadata: { businessId, plan },
+        trial_period_days: 7
+      },
       allow_promotion_codes: true
     });
 
