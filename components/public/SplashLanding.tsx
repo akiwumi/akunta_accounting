@@ -48,9 +48,17 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
   }, [initialLocale]);
 
   useEffect(() => {
+    // Skip splash if already seen this session (e.g. after a language change reload)
+    if (sessionStorage.getItem("akunta_splash_shown")) {
+      setPhase("landing");
+      return;
+    }
     // Logo fade-in takes ~500ms, then wait 3 seconds
     const fadeTimer = setTimeout(() => setPhase("fade"), 3500);
-    const landTimer = setTimeout(() => setPhase("landing"), 4200);
+    const landTimer = setTimeout(() => {
+      setPhase("landing");
+      sessionStorage.setItem("akunta_splash_shown", "1");
+    }, 4200);
     return () => { clearTimeout(fadeTimer); clearTimeout(landTimer); };
   }, []);
 
