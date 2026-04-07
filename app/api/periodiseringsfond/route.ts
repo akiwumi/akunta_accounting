@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 import { asNumber, round2 } from "@/lib/accounting/math";
 
@@ -16,9 +16,9 @@ const createSchema = z.object({
 });
 
 export async function GET() {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const entries = await prisma.periodisationEntry.findMany({
-    where: { businessId: business.id },
+    where: { businessId },
     orderBy: [{ taxYear: "desc" }, { createdAt: "desc" }]
   });
 
@@ -48,13 +48,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const body = await request.json();
   const payload = createSchema.parse(body);
 
   const entry = await prisma.periodisationEntry.create({
     data: {
-      businessId: business.id,
+      businessId,
       entryType: payload.entryType,
       direction: payload.direction,
       taxYear: payload.taxYear,

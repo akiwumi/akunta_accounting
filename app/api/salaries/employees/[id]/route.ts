@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { asNumber } from "@/lib/accounting/math";
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { PAYROLL_PRISMA_NOT_READY, isPayrollPrismaReady, prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -138,11 +138,11 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing employee id." }, { status: 400 });
   }
 
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const employee = await prisma.employee.findFirst({
     where: {
       id: employeeId,
-      businessId: business.id
+      businessId
     },
     include: {
       salaryEntries: {
@@ -201,13 +201,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing employee id." }, { status: 400 });
   }
 
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const payload = updateSchema.parse(await request.json());
 
   const existing = await prisma.employee.findFirst({
     where: {
       id: employeeId,
-      businessId: business.id
+      businessId
     },
     select: { id: true }
   });
@@ -271,11 +271,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing employee id." }, { status: 400 });
   }
 
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const existing = await prisma.employee.findFirst({
     where: {
       id: employeeId,
-      businessId: business.id
+      businessId
     },
     include: {
       salaryEntries: { select: { id: true } },

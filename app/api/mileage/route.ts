@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 import { round2 } from "@/lib/accounting/math";
 
@@ -19,11 +19,11 @@ const createSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const { searchParams } = new URL(request.url);
   const year = searchParams.get("year");
 
-  const where: Record<string, unknown> = { businessId: business.id };
+  const where: Record<string, unknown> = { businessId };
   if (year) {
     where.tripDate = {
       gte: new Date(`${year}-01-01`),
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const body = await request.json();
   const payload = createSchema.parse(body);
 
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
   const entry = await prisma.mileageEntry.create({
     data: {
-      businessId: business.id,
+      businessId,
       tripDate: new Date(payload.tripDate),
       destination: payload.destination,
       purpose: payload.purpose,

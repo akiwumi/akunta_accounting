@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { buildAccountingWorkbook } from "@/lib/accounting/excel";
 import { buildBalanceSheet, buildNeBilagaDraft, buildProfitAndLoss, buildVatReport } from "@/lib/accounting/reports";
 import { asNumber } from "@/lib/accounting/math";
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
+import { requireBusiness } from "@/lib/data/business";
 import { getFiscalYearStartMonth, resolveReportPeriod } from "@/lib/data/period";
 import { type Jurisdiction } from "@/lib/domain/enums";
 import { getTaxEngine } from "@/lib/tax/engines";
@@ -12,16 +13,17 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const period = resolveReportPeriod(
     new URL(request.url).searchParams,
     getFiscalYearStartMonth(business.fiscalYearStart)
   );
   const [profitAndLoss, balanceSheet, vat, neDraft] = await Promise.all([
-    buildProfitAndLoss({ businessId: business.id, ...period }),
-    buildBalanceSheet({ businessId: business.id, ...period }),
-    buildVatReport({ businessId: business.id, ...period }),
-    buildNeBilagaDraft({ businessId: business.id, ...period })
+    buildProfitAndLoss({ businessId, ...period }),
+    buildBalanceSheet({ businessId, ...period }),
+    buildVatReport({ businessId, ...period }),
+    buildNeBilagaDraft({ businessId, ...period })
   ]);
 
   if (!business.taxConfig) {

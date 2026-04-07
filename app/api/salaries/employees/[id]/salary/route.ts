@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { asNumber } from "@/lib/accounting/math";
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { PAYROLL_PRISMA_NOT_READY, isPayrollPrismaReady, prisma } from "@/lib/db";
 import { calculateSalaryBreakdown } from "@/lib/salaries/calculations";
 
@@ -39,7 +39,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing employee id." }, { status: 400 });
   }
 
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const payload = createSalarySchema.parse(await request.json());
   const payrollDate = new Date(`${payload.payrollDate}T00:00:00.000Z`);
   const periodFrom = payload.periodFrom ? new Date(`${payload.periodFrom}T00:00:00.000Z`) : null;
@@ -61,7 +61,7 @@ export async function POST(request: Request, context: RouteContext) {
   const employee = await prisma.employee.findFirst({
     where: {
       id: employeeId,
-      businessId: business.id
+      businessId
     },
     select: {
       id: true,
@@ -91,7 +91,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   const salaryEntry = await prisma.salaryEntry.create({
     data: {
-      businessId: business.id,
+      businessId,
       employeeId: employee.id,
       payrollDate,
       periodFrom,

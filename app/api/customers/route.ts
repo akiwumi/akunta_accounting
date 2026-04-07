@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -21,7 +21,13 @@ const customerSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const business = await ensureBusiness();
+  let businessId: string;
+  try {
+    ({ businessId } = await requireAuthContext());
+  } catch {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q")?.trim() ?? "";
   const limitRaw = Number(searchParams.get("limit") ?? "20");
@@ -29,7 +35,7 @@ export async function GET(request: Request) {
 
   const customers = await prisma.customer.findMany({
     where: {
-      businessId: business.id,
+      businessId,
       ...(query
         ? {
             OR: [
@@ -61,7 +67,13 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const business = await ensureBusiness();
+  let businessId: string;
+  try {
+    ({ businessId } = await requireAuthContext());
+  } catch {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const payload = customerSchema.parse(await request.json());
   const normalizedEmail = payload.email?.trim() || null;
 
@@ -69,7 +81,7 @@ export async function POST(request: Request) {
     normalizedEmail &&
     (await prisma.customer.findFirst({
       where: {
-        businessId: business.id,
+        businessId,
         email: normalizedEmail
       },
       select: { id: true }
@@ -106,7 +118,7 @@ export async function POST(request: Request) {
       })
     : await prisma.customer.create({
         data: {
-          businessId: business.id,
+          businessId,
           name: payload.name,
           email: normalizedEmail,
           phone: payload.phone?.trim() || null,

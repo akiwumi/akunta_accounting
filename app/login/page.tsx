@@ -42,7 +42,7 @@ export default function LoginPage() {
 
       setIsLeaving(true);
       setTimeout(() => {
-        router.replace("/");
+        router.replace("/dashboard");
         router.refresh();
       }, 340);
     } catch {

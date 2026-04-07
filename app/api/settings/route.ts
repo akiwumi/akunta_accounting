@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
+import { requireBusiness } from "@/lib/data/business";
 import { prisma } from "@/lib/db";
 import { Jurisdictions } from "@/lib/domain/enums";
 import {
@@ -46,13 +47,14 @@ const updateSchema = z.object({
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const fullBusiness = await prisma.business.findUnique({
-    where: { id: business.id },
+    where: { id: businessId },
     include: { taxConfig: true }
   });
+  if (!fullBusiness) return NextResponse.json({ error: "Business not found." }, { status: 404 });
   const localSettings = await readLocalSettings();
-  return NextResponse.json(mergeBusinessWithLocalSettings(fullBusiness ?? business, localSettings));
+  return NextResponse.json(mergeBusinessWithLocalSettings(fullBusiness, localSettings));
 }
 
 export async function PUT(request: Request) {
@@ -105,11 +107,11 @@ export async function PUT(request: Request) {
     // Always persist locally so settings survive even if DB write fails.
     await writeLocalSettings(localPayload);
 
-    const business = await ensureBusiness();
+    const { businessId } = await requireAuthContext();
 
     try {
       const updated = await prisma.business.update({
-        where: { id: business.id },
+        where: { id: businessId },
         data: {
           name: payload.name,
           jurisdiction: payload.jurisdiction,
@@ -158,7 +160,8 @@ export async function PUT(request: Request) {
         savedLocally: true
       });
     } catch (dbError) {
-      const merged = mergeBusinessWithLocalSettings(business, localPayload);
+      const fallback = await prisma.business.findUnique({ where: { id: businessId }, include: { taxConfig: true } });
+      const merged = mergeBusinessWithLocalSettings(fallback ?? { id: businessId } as never, localPayload);
       return NextResponse.json({
         ...merged,
         savedLocally: true,

@@ -1,61 +1,42 @@
-import { swedishSoleTraderDefaultAccounts } from "@/lib/accounting/chartOfAccounts";
-import { mergeBusinessWithLocalSettings, readLocalSettings } from "@/lib/data/localSettings";
 import { prisma } from "@/lib/db";
-import { Jurisdictions } from "@/lib/domain/enums";
 
-const DEFAULT_BUSINESS_NAME = "My Sole Trader Business";
+// ─── Membership-based resolution ─────────────────────────────────────────────
+
+export const getBusinessById = async (businessId: string) => {
+  return prisma.business.findUnique({
+    where: { id: businessId },
+    include: { taxConfig: true }
+  });
+};
+
+export const requireBusiness = async (businessId: string) => {
+  const business = await getBusinessById(businessId);
+  if (!business) throw new Error(`Business not found: ${businessId}`);
+  return business;
+};
+
+export const getUserBusiness = async (userId: string) => {
+  const membership = await prisma.membership.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    include: {
+      business: { include: { taxConfig: true } }
+    }
+  });
+  return membership?.business ?? null;
+};
+
+// ─── Legacy shim — used by routes that haven't been migrated yet ──────────────
+// Returns the first business in DB (single-tenant fallback for development).
+// All production routes must use requireAuthContextFromRequest + requireBusiness instead.
 
 export const ensureBusiness = async () => {
   const existing = await prisma.business.findFirst({
-    include: {
-      taxConfig: true
-    }
+    include: { taxConfig: true }
   });
+  if (existing) return existing;
 
-  if (existing) {
-    const localSettings = await readLocalSettings();
-    return mergeBusinessWithLocalSettings(existing, localSettings);
-  }
-
-  const business = await prisma.business.create({
-    data: {
-      name: DEFAULT_BUSINESS_NAME,
-      orgType: "sole_trader",
-      jurisdiction: Jurisdictions.SWEDEN,
-      bookkeepingMethod: "kontantmetoden",
-      vatRegistered: true,
-      vatFrequency: "yearly",
-      fiscalYearStart: new Date("2026-01-01T00:00:00.000Z"),
-      baseCurrency: "SEK",
-      locale: "en",
-      invoiceNumberPattern: "INV-{YYYY}-{SEQ:4}",
-      nextInvoiceSequence: 1,
-      invoiceSenderName: DEFAULT_BUSINESS_NAME,
-      accounts: {
-        create: swedishSoleTraderDefaultAccounts.map((account) => ({
-          code: account.code,
-          name: account.name,
-          type: account.type,
-          vatCode: account.vatCode,
-          isSystem: account.isSystem ?? false
-        }))
-      },
-      taxConfig: {
-        create: {
-          municipalTaxRate: 0.32,
-          socialContributionRate: 0.2897,
-          generalDeductionRate: 0.25,
-          vatStandardRate: 0.25,
-          vatReducedRateFood: 0.12,
-          vatReducedRateCulture: 0.06
-        }
-      }
-    },
-    include: {
-      taxConfig: true
-    }
-  });
-
-  const localSettings = await readLocalSettings();
-  return mergeBusinessWithLocalSettings(business, localSettings);
+  throw new Error(
+    "No business found. Please register an account to set up your business."
+  );
 };

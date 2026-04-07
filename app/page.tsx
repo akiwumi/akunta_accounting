@@ -1,196 +1,220 @@
-import { buildDashboardSummary } from "@/lib/accounting/reports";
-import { SectionExportBar } from "@/components/layout/SectionExportBar";
-import { fiscalYearPeriod, formatTaxYearLabel, getFiscalYearStartMonth, parseTaxYear } from "@/lib/data/period";
-import { getClosedTaxYearsForBusiness, getLatestClosedTaxYear } from "@/lib/data/taxYears";
-import { ensureBusiness } from "@/lib/data/business";
-import { formatMoney } from "@/lib/data/format";
-import { prisma } from "@/lib/db";
-import { getRequestLocale } from "@/lib/i18n/locale";
+import Image from "next/image";
+import Link from "next/link";
 
-type DashboardPageProps = {
-  searchParams?: {
-    year?: string;
-  };
-};
+import { getLatestBlogPosts } from "@/lib/content/blog";
 
-export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const locale = getRequestLocale();
-  const copy =
-    locale === "sv"
-      ? {
-          title: "Bokföringsöversikt",
-          annual: "Årsbokslut (historik)",
-          taxYear: "Skatteår",
-          customNote: "Stängda skatteår följer din valda skatteårsperiod i inställningarna.",
-          loadYear: "Ladda år",
-          revenue: "Intäkter",
-          expenses: "Kostnader",
-          operatingProfit: "Rörelseresultat",
-          vatPayable: "Beräknad moms att betala",
-          vatOutput: "Utgående moms (löpande)",
-          vatInput: "Ingående moms (löpande)",
-          transactions: "Bokförda transaktioner",
-          receipts: "Lagrade kvitton",
-          workflow: "Arbetsflöde",
-          exportAccounts: "Exportera hela bokföringen (Excel)",
-          step1: "1. Ladda upp eller vidarebefordra kvitton på sidan Kvitton.",
-          step2: "2. Importera bank-CSV för att bokföra kontantmetodstransaktioner automatiskt.",
-          step3: "3. Skapa P&L, balansräkning, moms, skatteprognos och NE-utkast under Rapporter.",
-          step4: "4. Exportera arbetsboken till Excel för redovisning och deklarationsunderlag."
-        }
-      : {
-          title: "Accounting Dashboard",
-          annual: "Annual Books (Historical)",
-          taxYear: "Tax Year",
-          customNote: "Closed tax years follow your configured tax-year range in settings.",
-          loadYear: "Load Year",
-          revenue: "Revenue",
-          expenses: "Expenses",
-          operatingProfit: "Operating Profit",
-          vatPayable: "Estimated VAT Payable",
-          vatOutput: "Output VAT (Running)",
-          vatInput: "Input VAT (Running)",
-          transactions: "Transactions Posted",
-          receipts: "Receipts Stored",
-          workflow: "Workflow Status",
-          exportAccounts: "Export Full Accounts (Excel)",
-          step1: "1. Upload or forward receipts from the Receipts page.",
-          step2: "2. Import bank CSV to auto-post cash-method transactions.",
-          step3: "3. Generate P&L, Balance, VAT, Tax Estimate and NE-bilaga draft under Reports.",
-          step4: "4. Export the workbook to Excel for your accountant and tax return prep."
-        };
-  const numberLocale = locale === "sv" ? "sv-SE" : "en-GB";
+const features = [
+  {
+    icon: "RC",
+    title: "Receipt capture",
+    description: "Upload or forward receipts by email. OCR extracts vendor, amount, VAT, and date automatically."
+  },
+  {
+    icon: "IV",
+    title: "Invoicing",
+    description: "Create, send, and track invoices with automatic VAT calculation and PDF generation."
+  },
+  {
+    icon: "BC",
+    title: "Bank import",
+    description: "Import your bank CSV and Akunta posts every row to the correct BAS account instantly."
+  },
+  {
+    icon: "RP",
+    title: "Reports & exports",
+    description: "P&L, balance sheet, VAT summary, and NE-bilaga draft — all exportable to Excel."
+  },
+  {
+    icon: "CK",
+    title: "Swedish compliance",
+    description: "Momsdeklaration, arbetsgivardeklaration, and period locks built for Skatteverket requirements."
+  },
+  {
+    icon: "SL",
+    title: "Payroll",
+    description: "Calculate gross-to-net salary, employer contributions, and generate payslips for your employees."
+  }
+];
 
-  const business = await ensureBusiness();
-  const fiscalYearStartMonth = getFiscalYearStartMonth(business.fiscalYearStart);
-  const closedTaxYears = await getClosedTaxYearsForBusiness(business.id, fiscalYearStartMonth);
-  const requestedYear = parseTaxYear(searchParams?.year);
-  const selectedYear =
-    requestedYear && closedTaxYears.includes(requestedYear)
-      ? requestedYear
-      : (closedTaxYears[0] ?? getLatestClosedTaxYear(fiscalYearStartMonth));
-  const period = fiscalYearPeriod(selectedYear, fiscalYearStartMonth);
-  const taxYearLabel = formatTaxYearLabel(selectedYear, fiscalYearStartMonth);
-  const [summary, transactionCount, receiptCount] = await Promise.all([
-    buildDashboardSummary({ businessId: business.id, ...period }),
-    prisma.transaction.count({
-      where: {
-        businessId: business.id,
-        txnDate: {
-          gte: period.from,
-          lte: period.to
-        }
-      }
-    }),
-    prisma.receipt.count({
-      where: {
-        businessId: business.id,
-        OR: [
-          {
-            receiptDate: {
-              gte: period.from,
-              lte: period.to
-            }
-          },
-          {
-            receiptDate: null,
-            createdAt: {
-              gte: period.from,
-              lte: period.to
-            }
-          }
-        ]
-      }
-    })
-  ]);
+const testimonials = [
+  {
+    quote: "I went from spending a weekend on quarterly VAT to about 20 minutes. The bank import alone is worth it.",
+    author: "Sara L.",
+    role: "Freelance designer, Stockholm"
+  },
+  {
+    quote: "Finally a bookkeeping tool that understands Swedish sole trader rules without trying to be everything to everyone.",
+    author: "Marcus H.",
+    role: "IT consultant, Gothenburg"
+  },
+  {
+    quote: "My accountant now receives a clean Excel export every year. She stopped asking me to fix things.",
+    author: "Annika W.",
+    role: "Copywriter, Malmö"
+  },
+  {
+    quote: "The OCR on receipts isn't perfect but it's accurate enough that I only ever correct one or two fields.",
+    author: "Johan R.",
+    role: "Photographer, Uppsala"
+  },
+  {
+    quote: "Switching from a spreadsheet felt scary. Akunta made it obvious. I was up and running in an afternoon.",
+    author: "Petra M.",
+    role: "Therapist, Linköping"
+  }
+];
+
+export default function LandingPage() {
+  const latestPosts = getLatestBlogPosts(4);
 
   return (
-    <section className="page dashboardPage">
-      <h1 className="title">{copy.title}</h1>
-      <p className="subtitle dashboardMeta">
-        {business.name} · {business.jurisdiction} · {business.bookkeepingMethod} · VAT {business.vatFrequency} ·{" "}
-        {copy.taxYear} {taxYearLabel}
-      </p>
-      <SectionExportBar locale={locale} section="dashboard" params={{ year: String(selectedYear) }} />
-      <div className="row dashboardExportRow" id="dashboard-export-accounts">
-        <a className="button" href={`/api/exports/accounts?year=${selectedYear}`}>
-          {copy.exportAccounts}
-        </a>
-      </div>
-
-      <article className="card" id="annual-books">
-        <h2>{copy.annual}</h2>
-        <form className="row dashboardYearForm" method="get">
-          <label className="stack">
-            {copy.taxYear}
-            <select name="year" defaultValue={String(selectedYear)}>
-              {closedTaxYears.map((year) => (
-                <option key={year} value={year}>
-                  {formatTaxYearLabel(year, fiscalYearStartMonth)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="row dashboardYearFormActions">
-            <button type="submit">{copy.loadYear}</button>
-          </div>
-        </form>
-        <p className="note">{copy.customNote}</p>
-      </article>
-
-      <div className="grid dashboardKpiGrid" id="summary-kpis">
-        <article className="card dashboardKpiCard">
-          <p className="label">
-            {copy.revenue} ({taxYearLabel})
-          </p>
-          <p className="kpi">{formatMoney(summary.revenue, "SEK", numberLocale)}</p>
-        </article>
-        <article className="card dashboardKpiCard">
-          <p className="label">
-            {copy.expenses} ({taxYearLabel})
-          </p>
-          <p className="kpi">{formatMoney(summary.expenses, "SEK", numberLocale)}</p>
-        </article>
-        <article className="card dashboardKpiCard">
-          <p className="label">
-            {copy.operatingProfit} ({taxYearLabel})
-          </p>
-          <p className="kpi">{formatMoney(summary.operatingProfit, "SEK", numberLocale)}</p>
-        </article>
-        <article className="card dashboardKpiCard">
-          <p className="label">{copy.vatPayable}</p>
-          <p className="kpi">{formatMoney(summary.vatPayable, "SEK", numberLocale)}</p>
-        </article>
-        <article className="card dashboardKpiCard">
-          <p className="label">{copy.vatOutput}</p>
-          <p className="kpi">{formatMoney(summary.vatOutput, "SEK", numberLocale)}</p>
-        </article>
-        <article className="card dashboardKpiCard">
-          <p className="label">{copy.vatInput}</p>
-          <p className="kpi">{formatMoney(summary.vatInput, "SEK", numberLocale)}</p>
-        </article>
-      </div>
-
-      <div className="grid dashboardActivityGrid" id="activity-summary">
-        <article className="card dashboardKpiCard">
-          <p className="label">{copy.transactions}</p>
-          <p className="kpi">{transactionCount}</p>
-        </article>
-        <article className="card dashboardKpiCard">
-          <p className="label">{copy.receipts}</p>
-          <p className="kpi">{receiptCount}</p>
-        </article>
-      </div>
-
-      <article className="card" id="workflow">
-        <h2>{copy.workflow}</h2>
-        <div className="stack dashboardWorkflowList">
-          <p className="note">{copy.step1}</p>
-          <p className="note">{copy.step2}</p>
-          <p className="note">{copy.step3}</p>
-          <p className="note">{copy.step4}</p>
+    <div className="publicPage">
+      {/* ── Nav ────────────────────────────────────────────────────────── */}
+      <header className="publicNav">
+        <div className="publicNavInner">
+          <Link href="/" className="publicNavBrand">
+            <Image src="/akunta_logo.png" alt="Akunta" width={32} height={32} className="publicNavLogo" />
+            <span className="publicNavWordmark">Akunta</span>
+          </Link>
+          <nav className="publicNavLinks">
+            <Link href="/help">Help</Link>
+            <Link href="/blog">Blog</Link>
+            <Link href="/resources">Resources</Link>
+            <Link href="/support">Support</Link>
+          </nav>
+          <Link href="/login" className="button publicNavCta">
+            Sign in
+          </Link>
         </div>
-      </article>
-    </section>
+      </header>
+
+      {/* ── Hero ───────────────────────────────────────────────────────── */}
+      <section className="publicHero">
+        <div className="publicHeroContent">
+          <h1 className="publicHeroTitle">
+            Bookkeeping for Swedish sole traders — without the pain.
+          </h1>
+          <p className="publicHeroSubtitle">
+            Akunta handles receipts, invoices, bank imports, VAT, and payroll in one place.
+            Swedish rules built in. No accountant required for day-to-day books.
+          </p>
+          <div className="publicHeroCtas">
+            <Link href="/register" className="button publicHeroCtaPrimary">
+              Start free
+            </Link>
+            <Link href="/login" className="button tertiary">
+              Sign in
+            </Link>
+          </div>
+        </div>
+        <div className="publicHeroImage" aria-hidden>
+          <Image
+            src="/akunta_logo.png"
+            alt=""
+            width={200}
+            height={200}
+            className="publicHeroLogo"
+            priority
+          />
+        </div>
+      </section>
+
+      {/* ── Features ───────────────────────────────────────────────────── */}
+      <section className="publicSection" id="features">
+        <div className="publicSectionInner">
+          <h2 className="publicSectionTitle">Everything you need. Nothing you don't.</h2>
+          <div className="publicFeaturesGrid">
+            {features.map((f) => (
+              <article key={f.icon} className="publicFeatureCard">
+                <span className="publicFeatureIcon" aria-hidden>{f.icon}</span>
+                <h3>{f.title}</h3>
+                <p>{f.description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Testimonials ───────────────────────────────────────────────── */}
+      <section className="publicSection publicSectionAlt" id="testimonials">
+        <div className="publicSectionInner">
+          <h2 className="publicSectionTitle">What sole traders say</h2>
+          <div className="publicTestimonialsGrid">
+            {testimonials.map((t) => (
+              <blockquote key={t.author} className="publicTestimonialCard">
+                <p className="publicTestimonialQuote">&ldquo;{t.quote}&rdquo;</p>
+                <footer>
+                  <strong>{t.author}</strong>
+                  <span className="publicTestimonialRole">{t.role}</span>
+                </footer>
+              </blockquote>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Latest blog posts ───────────────────────────────────────────── */}
+      <section className="publicSection" id="blog">
+        <div className="publicSectionInner">
+          <h2 className="publicSectionTitle">Latest from the blog</h2>
+          <div className="publicBlogGrid">
+            {latestPosts.map((post) => (
+              <article key={post.slug} className="publicBlogCard">
+                <time className="publicBlogDate" dateTime={post.date}>
+                  {new Date(post.date).toLocaleDateString("en-GB", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric"
+                  })}
+                </time>
+                <h3>
+                  <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+                </h3>
+                <p className="publicBlogExcerpt">{post.excerpt}</p>
+                <Link href={`/blog/${post.slug}`} className="publicBlogReadMore">
+                  Read more →
+                </Link>
+              </article>
+            ))}
+          </div>
+          <div className="publicSectionAction">
+            <Link href="/blog" className="button tertiary">
+              All articles
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA footer ─────────────────────────────────────────────────── */}
+      <section className="publicCtaBanner">
+        <div className="publicCtaBannerInner">
+          <h2>Ready to simplify your bookkeeping?</h2>
+          <p>Get started in minutes. No credit card required for the free plan.</p>
+          <Link href="/register" className="button publicHeroCtaPrimary">
+            Create your account
+          </Link>
+        </div>
+      </section>
+
+      {/* ── Footer ─────────────────────────────────────────────────────── */}
+      <footer className="publicFooter">
+        <div className="publicFooterInner">
+          <div className="publicFooterBrand">
+            <Image src="/akunta_logo.png" alt="Akunta" width={24} height={24} />
+            <span>Akunta</span>
+          </div>
+          <nav className="publicFooterLinks">
+            <Link href="/help">Help</Link>
+            <Link href="/blog">Blog</Link>
+            <Link href="/resources">Resources</Link>
+            <Link href="/support">Support</Link>
+            <Link href="/login">Sign in</Link>
+          </nav>
+          <p className="publicFooterLegal">
+            &copy; {new Date().getFullYear()} Akunta. Built for Swedish sole traders.
+          </p>
+        </div>
+      </footer>
+    </div>
   );
 }

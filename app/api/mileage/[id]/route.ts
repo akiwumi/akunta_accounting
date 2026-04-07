@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const existing = await prisma.mileageEntry.findFirst({
-    where: { id: params.id, businessId: business.id }
+    where: { id: params.id, businessId }
   });
   if (!existing) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });

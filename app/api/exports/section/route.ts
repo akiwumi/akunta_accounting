@@ -11,7 +11,8 @@ import {
   buildProfitAndLoss,
   buildVatReport
 } from "@/lib/accounting/reports";
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
+import { requireBusiness } from "@/lib/data/business";
 import {
   calendarMonthPeriod,
   calendarYearPeriod,
@@ -104,19 +105,20 @@ const tablesToPdfLines = (tables: ExportTable[]) => {
 };
 
 const buildDashboardExport = async (params: URLSearchParams): Promise<ExportResult> => {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const fiscalYearStartMonth = getFiscalYearStartMonth(business.fiscalYearStart);
   const selectedYear = parseTaxYear(params.get("year")) ?? getLatestClosedFiscalTaxYear(fiscalYearStartMonth);
   const period = fiscalYearPeriod(selectedYear, fiscalYearStartMonth);
   const taxYearLabel = formatTaxYearLabel(selectedYear, fiscalYearStartMonth);
   const [summary, transactionCount, receiptCount] = await Promise.all([
     buildDashboardSummary({
-      businessId: business.id,
+      businessId,
       ...period
     }),
     prisma.transaction.count({
       where: {
-        businessId: business.id,
+        businessId,
         txnDate: {
           gte: period.from,
           lte: period.to
@@ -125,7 +127,7 @@ const buildDashboardExport = async (params: URLSearchParams): Promise<ExportResu
     }),
     prisma.receipt.count({
       where: {
-        businessId: business.id,
+        businessId,
         OR: [
           {
             receiptDate: {
@@ -180,7 +182,8 @@ const buildDashboardExport = async (params: URLSearchParams): Promise<ExportResu
 };
 
 const buildReceiptsExport = async (params: URLSearchParams): Promise<ExportResult> => {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const selectedYear = parseTaxYear(params.get("year")) ?? new Date().getUTCFullYear();
   const selectedMonth = parseMonth(params.get("month"));
   const query = params.get("q")?.trim() || "";
@@ -188,7 +191,7 @@ const buildReceiptsExport = async (params: URLSearchParams): Promise<ExportResul
 
   const receipts = await prisma.receipt.findMany({
     where: {
-      businessId: business.id,
+      businessId,
       AND: [
         {
           OR: [
@@ -254,7 +257,8 @@ const buildReceiptsExport = async (params: URLSearchParams): Promise<ExportResul
 };
 
 const buildInvoicesExport = async (params: URLSearchParams): Promise<ExportResult> => {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const selectedYear = parseTaxYear(params.get("year")) ?? new Date().getUTCFullYear();
   const selectedMonth = parseMonth(params.get("month"));
   const query = params.get("q")?.trim() || "";
@@ -262,7 +266,7 @@ const buildInvoicesExport = async (params: URLSearchParams): Promise<ExportResul
 
   const invoices = await prisma.invoice.findMany({
     where: {
-      businessId: business.id,
+      businessId,
       issueDate: {
         gte: period.from,
         lte: period.to
@@ -319,9 +323,10 @@ const buildInvoicesExport = async (params: URLSearchParams): Promise<ExportResul
 };
 
 const buildImportsExport = async (): Promise<ExportResult> => {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const batches = await prisma.bankImportBatch.findMany({
-    where: { businessId: business.id },
+    where: { businessId },
     orderBy: { createdAt: "desc" },
     take: 1000
   });
@@ -346,9 +351,10 @@ const buildImportsExport = async (): Promise<ExportResult> => {
 };
 
 const buildTransactionsExport = async (): Promise<ExportResult> => {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const transactions = await prisma.transaction.findMany({
-    where: { businessId: business.id },
+    where: { businessId },
     include: {
       receipt: { select: { id: true, vendor: true } },
       paidInvoice: { select: { customerName: true, invoiceNumber: true } },
@@ -395,7 +401,8 @@ const buildTransactionsExport = async (): Promise<ExportResult> => {
 };
 
 const buildSalariesExport = async (params: URLSearchParams): Promise<ExportResult> => {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   if (!isPayrollPrismaReady()) {
     return {
       section: "salaries",
@@ -418,12 +425,12 @@ const buildSalariesExport = async (params: URLSearchParams): Promise<ExportResul
 
   const [employees, salaryEntries, expenseClaims] = await Promise.all([
     prisma.employee.findMany({
-      where: { businessId: business.id },
+      where: { businessId },
       orderBy: [{ status: "asc" }, { lastName: "asc" }, { firstName: "asc" }]
     }),
     prisma.salaryEntry.findMany({
       where: {
-        businessId: business.id,
+        businessId,
         ...(from || to
           ? {
               payrollDate: {
@@ -447,7 +454,7 @@ const buildSalariesExport = async (params: URLSearchParams): Promise<ExportResul
     }),
     prisma.employeeExpense.findMany({
       where: {
-        businessId: business.id,
+        businessId,
         ...(from || to
           ? {
               expenseDate: {
@@ -699,7 +706,8 @@ const buildSalariesExport = async (params: URLSearchParams): Promise<ExportResul
 };
 
 const buildLedgerExport = async (params: URLSearchParams): Promise<ExportResult> => {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const fiscalYearStartMonth = getFiscalYearStartMonth(business.fiscalYearStart);
   const selectedYear = parseTaxYear(params.get("year"));
   const selectedYearPeriod = selectedYear ? fiscalYearPeriod(selectedYear, fiscalYearStartMonth) : null;
@@ -709,7 +717,7 @@ const buildLedgerExport = async (params: URLSearchParams): Promise<ExportResult>
 
   const transactions = await prisma.transaction.findMany({
     where: {
-      businessId: business.id,
+      businessId,
       ...(from || to
         ? {
             txnDate: {
@@ -822,20 +830,21 @@ const buildLedgerExport = async (params: URLSearchParams): Promise<ExportResult>
 };
 
 const buildReviewExport = async (): Promise<ExportResult> => {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const [needsReviewReceipts, recentReceipts, otherInputs] = await Promise.all([
     prisma.receipt.findMany({
-      where: { businessId: business.id, needsReview: true },
+      where: { businessId, needsReview: true },
       orderBy: { createdAt: "desc" },
       take: 1000
     }),
     prisma.receipt.findMany({
-      where: { businessId: business.id },
+      where: { businessId },
       orderBy: { createdAt: "desc" },
       take: 1000
     }),
     prisma.transaction.findMany({
-      where: { businessId: business.id, receiptId: null },
+      where: { businessId, receiptId: null },
       orderBy: [{ txnDate: "desc" }, { createdAt: "desc" }],
       take: 1000
     })
@@ -878,14 +887,15 @@ const buildReviewExport = async (): Promise<ExportResult> => {
 };
 
 const buildReportsExport = async (params: URLSearchParams): Promise<ExportResult> => {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const period = resolveReportPeriod(params, getFiscalYearStartMonth(business.fiscalYearStart));
 
   const [profitAndLoss, balanceSheet, vat, neDraft] = await Promise.all([
-    buildProfitAndLoss({ businessId: business.id, ...period }),
-    buildBalanceSheet({ businessId: business.id, ...period }),
-    buildVatReport({ businessId: business.id, ...period }),
-    buildNeBilagaDraft({ businessId: business.id, ...period })
+    buildProfitAndLoss({ businessId, ...period }),
+    buildBalanceSheet({ businessId, ...period }),
+    buildVatReport({ businessId, ...period }),
+    buildNeBilagaDraft({ businessId, ...period })
   ]);
 
   if (!business.taxConfig) {
@@ -1008,7 +1018,8 @@ const buildReportsExport = async (params: URLSearchParams): Promise<ExportResult
 };
 
 const buildSettingsExport = async (): Promise<ExportResult> => {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const fiscalYearStartMonth = getFiscalYearStartMonth(business.fiscalYearStart);
   const fiscalYearEndMonth = getFiscalYearEndMonth(fiscalYearStartMonth);
 

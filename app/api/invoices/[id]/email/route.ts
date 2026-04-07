@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { z } from "zod";
 
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 import { loadInvoiceForOutput } from "@/lib/invoices/load";
 import { buildInvoicePdf } from "@/lib/invoices/pdf";
@@ -70,9 +70,9 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const invoice = await loadInvoiceForOutput({
-    businessId: business.id,
+    businessId,
     invoiceId
   });
 

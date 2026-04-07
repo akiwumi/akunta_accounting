@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { PAYROLL_PRISMA_NOT_READY, isPayrollPrismaReady, prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -22,11 +22,11 @@ export async function POST(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing expense id." }, { status: 400 });
   }
 
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const entry = await prisma.employeeExpense.findFirst({
     where: {
       id: expenseId,
-      businessId: business.id
+      businessId
     }
   });
   if (!entry) {

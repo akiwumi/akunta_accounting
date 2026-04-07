@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { asNumber } from "@/lib/accounting/math";
 import { computeInvoiceTotals } from "@/lib/invoices/calculations";
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 import { formatInvoiceNumber } from "@/lib/invoices/numbering";
 import { InvoiceVatModes } from "@/lib/invoices/types";
@@ -61,7 +61,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const business = await ensureBusiness();
+  let businessId: string;
+  try {
+    ({ businessId } = await requireAuthContext());
+  } catch {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const payload = createInvoiceSchema.parse(await request.json());
 
   const issueDate = new Date(`${payload.issueDate}T00:00:00.000Z`);
@@ -92,7 +98,7 @@ export async function POST(request: Request) {
   try {
     const invoice = await prisma.$transaction(async (tx) => {
       const freshBusiness = await tx.business.findUnique({
-        where: { id: business.id },
+        where: { id: businessId },
         select: {
           id: true,
           name: true,
@@ -118,21 +124,21 @@ export async function POST(request: Request) {
         ? await tx.customer.findFirst({
             where: {
               id: payload.customer.id,
-              businessId: business.id
+              businessId: businessId
             },
             select: { id: true }
           })
         : normalizedEmail
           ? await tx.customer.findFirst({
               where: {
-                businessId: business.id,
+                businessId: businessId,
                 email: normalizedEmail
               },
               select: { id: true }
             })
           : await tx.customer.findFirst({
               where: {
-                businessId: business.id,
+                businessId: businessId,
                 name: payload.customer.name.trim()
               },
               select: { id: true }
@@ -158,7 +164,7 @@ export async function POST(request: Request) {
           })
         : await tx.customer.create({
             data: {
-              businessId: business.id,
+              businessId: businessId,
               ...customerData
             },
             select: { id: true }
@@ -177,7 +183,7 @@ export async function POST(request: Request) {
       const sender = payload.sender ?? {};
       const created = await tx.invoice.create({
         data: {
-          businessId: business.id,
+          businessId: businessId,
           customerId: customer.id,
           invoiceNumber,
           customerName: payload.customer.name.trim(),
@@ -229,7 +235,7 @@ export async function POST(request: Request) {
 
       if (!customNumber) {
         await tx.business.update({
-          where: { id: business.id },
+          where: { id: businessId },
           data: { nextInvoiceSequence: { increment: 1 } }
         });
       }

@@ -6,7 +6,8 @@ import { NextResponse } from "next/server";
 
 import { createCashMethodTransaction } from "@/lib/accounting/posting";
 import { asNumber, round2 } from "@/lib/accounting/math";
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
+import { requireBusiness } from "@/lib/data/business";
 import { supportsReceiptItemPurchasedField } from "@/lib/data/receiptItemSupport";
 import { prisma } from "@/lib/db";
 import { EntrySources, TransactionDirections } from "@/lib/domain/enums";
@@ -47,7 +48,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No attachment in email payload." }, { status: 400 });
   }
 
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const canUseItemPurchased = await supportsReceiptItemPurchasedField();
   const fileBuffer = Buffer.from(attachment.Content, "base64");
   const originalFileName = attachment.Name ?? `email-receipt-${Date.now()}.bin`;
@@ -140,7 +142,7 @@ export async function POST(request: Request) {
 
   const receipt = await prisma.receipt.create({
     data: {
-      businessId: business.id,
+      businessId,
       source: "email",
       originalFileName,
       mimeType,
@@ -168,7 +170,7 @@ export async function POST(request: Request) {
     const direction = TransactionDirections.EXPENSE;
 
     transaction = await createCashMethodTransaction({
-      businessId: business.id,
+      businessId,
       txnDate: receiptDate ? new Date(`${receiptDate}T00:00:00.000Z`) : new Date(),
       description:
         itemPurchased ??

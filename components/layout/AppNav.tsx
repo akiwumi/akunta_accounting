@@ -3,13 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import { type Locale } from "@/lib/i18n/locale";
 
 const links = [
   // ── Main bookkeeping ──────────────────────────────────────────────────
-  { href: "/", icon: "DB", group: "main", labels: { en: "Dashboard", sv: "Översikt" } },
+  { href: "/dashboard", icon: "DB", group: "main", labels: { en: "Dashboard", sv: "Översikt" } },
   { href: "/receipts", icon: "RC", group: "main", labels: { en: "Receipts", sv: "Kvitton" } },
   { href: "/invoices", icon: "IV", group: "main", labels: { en: "Invoices", sv: "Fakturor" } },
   { href: "/imports", icon: "BC", group: "main", labels: { en: "Bank CSV", sv: "Bank-CSV" } },
@@ -22,6 +23,7 @@ const links = [
   { href: "/mileage", icon: "KJ", group: "tax", labels: { en: "Mileage Log", sv: "Körjournal" } },
   { href: "/periodiseringsfond", icon: "PF", group: "tax", labels: { en: "Tax Reserves", sv: "Periodiseringsfond" } },
   { href: "/compliance", icon: "CK", group: "tax", labels: { en: "Compliance", sv: "Kravlista" } },
+  { href: "/audit", icon: "AL", group: "tax", labels: { en: "Audit Trail", sv: "Revisionslogg" } },
   // ── Reports & settings ────────────────────────────────────────────────
   { href: "/reports", icon: "RP", group: "other", labels: { en: "Reports", sv: "Rapporter" } },
   { href: "/settings", icon: "ST", group: "other", labels: { en: "Settings", sv: "Inställningar" } }
@@ -35,7 +37,9 @@ const copy = {
     language: "Language",
     english: "English",
     swedish: "Swedish",
-    logout: "Log out"
+    logout: "Log out",
+    menu: "Menu",
+    close: "Close menu"
   },
   sv: {
     main: "",
@@ -44,7 +48,9 @@ const copy = {
     language: "Språk",
     english: "Engelska",
     swedish: "Svenska",
-    logout: "Logga ut"
+    logout: "Logga ut",
+    menu: "Meny",
+    close: "Stäng meny"
   }
 } as const;
 
@@ -52,9 +58,10 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
   const pathname = usePathname() || "/";
   const router = useRouter();
   const labels = copy[locale];
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActiveLink = (href: string) => {
-    if (href === "/") return pathname === "/";
+    if (href === "/dashboard") return pathname === "/dashboard";
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
@@ -70,12 +77,8 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
     router.refresh();
   };
 
-  return (
-    <aside className="sideNav">
-      <div className="sideNavBrand">
-        <Image src="/akunta_logo.png" alt="Akunta" width={610} height={614} className="brandLogoFull" priority />
-        <p className="brandSubline">Bookkeeping Accounting</p>
-      </div>
+  const navLinks = (
+    <>
       <div className="sideNavSections">
         {groups.map(({ key, label }) => (
           <div className="sideNavGroup" key={key}>
@@ -87,6 +90,7 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
                   key={link.href}
                   href={link.href}
                   className={`sideNavLink${isActiveLink(link.href) ? " active" : ""}`}
+                  onClick={() => setMobileOpen(false)}
                 >
                   <span className="sideNavIcon" aria-hidden>
                     {link.icon}
@@ -108,6 +112,54 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
           {labels.logout}
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop / tablet sidebar */}
+      <aside className="sideNav sideNavDesktop">
+        <div className="sideNavBrand">
+          <Image src="/akunta_logo.png" alt="Akunta" width={610} height={614} className="brandLogoFull" priority />
+          <p className="brandSubline">Bookkeeping Accounting</p>
+        </div>
+        {navLinks}
+      </aside>
+
+      {/* Mobile top bar */}
+      <header className="mobileTopBar">
+        <div className="mobileTopBarBrand">
+          <Image src="/akunta_logo.png" alt="Akunta" width={28} height={28} className="mobileTopBarLogo" />
+          <span className="mobileTopBarWordmark">Akunta</span>
+        </div>
+        <button
+          type="button"
+          className="mobileMenuToggle"
+          aria-label={mobileOpen ? labels.close : labels.menu}
+          aria-expanded={mobileOpen}
+          onClick={() => setMobileOpen((v) => !v)}
+        >
+          <span className={`hamburger${mobileOpen ? " hamburgerOpen" : ""}`} aria-hidden>
+            <span /><span /><span />
+          </span>
+        </button>
+      </header>
+
+      {/* Mobile slide-in drawer */}
+      {mobileOpen && (
+        <div
+          className="mobileNavOverlay"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden
+        />
+      )}
+      <aside className={`mobileNavDrawer${mobileOpen ? " mobileNavDrawerOpen" : ""}`} aria-label="Navigation">
+        <div className="sideNavBrand mobileDrawerBrand">
+          <Image src="/akunta_logo.png" alt="Akunta" width={36} height={36} className="brandLogoFull" />
+          <p className="brandSubline">Bookkeeping Accounting</p>
+        </div>
+        {navLinks}
+      </aside>
+    </>
   );
 };

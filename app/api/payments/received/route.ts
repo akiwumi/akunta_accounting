@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { createCashMethodTransaction } from "@/lib/accounting/posting";
 import { asNumber } from "@/lib/accounting/math";
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 import { EntrySources, TransactionDirections } from "@/lib/domain/enums";
 
@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const payload = paymentReceivedSchema.parse(await request.json());
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
 
   const paymentDate = new Date(`${payload.paymentDate}T00:00:00.000Z`);
   if (Number.isNaN(paymentDate.valueOf())) {
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   const linkedInvoice = normalizedReference
     ? await prisma.invoice.findFirst({
         where: {
-          businessId: business.id,
+          businessId,
           invoiceNumber: normalizedReference,
           status: "UNPAID"
         },
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
         : undefined;
 
   const transaction = await createCashMethodTransaction({
-    businessId: business.id,
+    businessId,
     txnDate: paymentDate,
     description,
     direction: TransactionDirections.INCOME,

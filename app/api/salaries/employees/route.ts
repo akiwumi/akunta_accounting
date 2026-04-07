@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { asNumber, round2 } from "@/lib/accounting/math";
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
+import { requireBusiness } from "@/lib/data/business";
 import { PAYROLL_PRISMA_NOT_READY, isPayrollPrismaReady, prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -156,9 +157,10 @@ export async function GET() {
     return NextResponse.json({ error: PAYROLL_PRISMA_NOT_READY }, { status: 503 });
   }
 
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const employees = await prisma.employee.findMany({
-    where: { businessId: business.id },
+    where: { businessId },
     include: {
       salaryEntries: {
         select: {
@@ -190,12 +192,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: PAYROLL_PRISMA_NOT_READY }, { status: 503 });
   }
 
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const payload = employeeSchema.parse(await request.json());
 
   const created = await prisma.employee.create({
     data: {
-      businessId: business.id,
+      businessId,
       employeeNumber: payload.employeeNumber?.trim() || null,
       firstName: payload.firstName.trim(),
       lastName: payload.lastName.trim(),

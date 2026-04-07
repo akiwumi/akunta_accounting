@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { asNumber } from "@/lib/accounting/math";
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { PAYROLL_PRISMA_NOT_READY, isPayrollPrismaReady, prisma } from "@/lib/db";
 import { calculateExpenseBreakdown } from "@/lib/salaries/calculations";
 
@@ -36,7 +36,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing employee id." }, { status: 400 });
   }
 
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const payload = createExpenseSchema.parse(await request.json());
   const expenseDate = new Date(`${payload.expenseDate}T00:00:00.000Z`);
   if (Number.isNaN(expenseDate.valueOf())) {
@@ -46,7 +46,7 @@ export async function POST(request: Request, context: RouteContext) {
   const employee = await prisma.employee.findFirst({
     where: {
       id: employeeId,
-      businessId: business.id
+      businessId
     },
     select: {
       id: true,
@@ -63,7 +63,7 @@ export async function POST(request: Request, context: RouteContext) {
   const amounts = calculateExpenseBreakdown(payload.grossAmount, payload.vatAmount ?? 0);
   const entry = await prisma.employeeExpense.create({
     data: {
-      businessId: business.id,
+      businessId,
       employeeId: employee.id,
       expenseDate,
       category: payload.category.trim(),

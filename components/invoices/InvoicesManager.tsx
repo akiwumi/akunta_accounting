@@ -1055,7 +1055,7 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
               </div>
             </div>
 
-            <div className="tableWrap">
+            <div className="tableWrap invoicesTableWrap">
               <table>
                 <thead>
                   <tr>

@@ -9,7 +9,8 @@ import {
   buildProfitAndLoss,
   buildVatReport
 } from "@/lib/accounting/reports";
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
+import { requireBusiness } from "@/lib/data/business";
 import { fiscalYearPeriod, formatTaxYearLabel, getFiscalYearStartMonth, parseTaxYear } from "@/lib/data/period";
 import { getClosedTaxYearsForBusiness, getLatestClosedTaxYear } from "@/lib/data/taxYears";
 import { isPayrollPrismaReady, prisma } from "@/lib/db";
@@ -114,7 +115,8 @@ const aggregateTransactions = (
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
+  const business = await requireBusiness(businessId);
   const fiscalYearStartMonth = getFiscalYearStartMonth(business.fiscalYearStart);
   const closedTaxYears = await getClosedTaxYearsForBusiness(business.id, fiscalYearStartMonth);
   const requestedYear = parseTaxYear(url.searchParams.get("year"));
@@ -146,28 +148,28 @@ export async function GET(request: Request) {
     mileageEntries,
     periodisationEntries
   ] = await Promise.all([
-    buildDashboardSummary({ businessId: business.id, ...period }),
-    buildProfitAndLoss({ businessId: business.id, ...period }),
-    buildBalanceSheet({ businessId: business.id, ...period }),
-    buildVatReport({ businessId: business.id, ...period }),
-    buildNeBilagaDraft({ businessId: business.id, ...period }),
+    buildDashboardSummary({ businessId, ...period }),
+    buildProfitAndLoss({ businessId, ...period }),
+    buildBalanceSheet({ businessId, ...period }),
+    buildVatReport({ businessId, ...period }),
+    buildNeBilagaDraft({ businessId, ...period }),
     prisma.account.findMany({
-      where: { businessId: business.id },
+      where: { businessId },
       orderBy: { code: "asc" }
     }),
     prisma.customer.findMany({
-      where: { businessId: business.id },
+      where: { businessId },
       orderBy: [{ name: "asc" }, { createdAt: "asc" }]
     }),
     payrollReady
       ? prisma.employee.findMany({
-          where: { businessId: business.id },
+          where: { businessId },
           orderBy: [{ status: "asc" }, { lastName: "asc" }, { firstName: "asc" }]
         })
       : Promise.resolve([]),
     payrollReady
       ? prisma.salaryEntry.findMany({
-          where: { businessId: business.id },
+          where: { businessId },
           include: {
             employee: {
               select: {
@@ -183,7 +185,7 @@ export async function GET(request: Request) {
       : Promise.resolve([]),
     payrollReady
       ? prisma.employeeExpense.findMany({
-          where: { businessId: business.id },
+          where: { businessId },
           include: {
             employee: {
               select: {
@@ -198,13 +200,13 @@ export async function GET(request: Request) {
         })
       : Promise.resolve([]),
     prisma.receipt.findMany({
-      where: { businessId: business.id },
+      where: { businessId },
       include: { transactions: { select: { id: true } } },
       orderBy: [{ receiptDate: "desc" }, { createdAt: "desc" }],
       take: 20000
     }),
     prisma.transaction.findMany({
-      where: { businessId: business.id },
+      where: { businessId },
       include: {
         receipt: { select: { id: true, vendor: true, receiptNumber: true, originalFileName: true } },
         paidInvoice: { select: { id: true, invoiceNumber: true, customerName: true } },
@@ -214,7 +216,7 @@ export async function GET(request: Request) {
       take: 20000
     }),
     prisma.invoice.findMany({
-      where: { businessId: business.id },
+      where: { businessId },
       include: {
         customer: true,
         paidTransaction: { select: { id: true } },
@@ -224,28 +226,28 @@ export async function GET(request: Request) {
       take: 20000
     }),
     prisma.bankImportBatch.findMany({
-      where: { businessId: business.id },
+      where: { businessId },
       orderBy: { createdAt: "desc" },
       take: 20000
     }),
     prisma.bankImportRow.findMany({
-      where: { batch: { businessId: business.id } },
+      where: { batch: { businessId } },
       include: { batch: { select: { fileName: true, createdAt: true } } },
       orderBy: [{ txnDate: "desc" }, { rowNumber: "asc" }],
       take: 20000
     }),
     prisma.fixedAsset.findMany({
-      where: { businessId: business.id },
+      where: { businessId },
       orderBy: [{ acquisitionDate: "desc" }, { createdAt: "desc" }],
       take: 20000
     }),
     prisma.mileageEntry.findMany({
-      where: { businessId: business.id },
+      where: { businessId },
       orderBy: [{ tripDate: "desc" }, { createdAt: "desc" }],
       take: 20000
     }),
     prisma.periodisationEntry.findMany({
-      where: { businessId: business.id },
+      where: { businessId },
       orderBy: [{ taxYear: "desc" }, { createdAt: "desc" }],
       take: 20000
     })

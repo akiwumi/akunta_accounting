@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { PAYROLL_PRISMA_NOT_READY, isPayrollPrismaReady, prisma } from "@/lib/db";
 import { asNumber } from "@/lib/accounting/math";
 import { postEmployeeExpenseTransaction } from "@/lib/salaries/posting";
@@ -30,7 +30,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing expense id." }, { status: 400 });
   }
 
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const payload = paySchema.parse(await request.json().catch(() => ({})));
   const parsedPaymentDate = payload.paymentDate
     ? new Date(`${payload.paymentDate}T00:00:00.000Z`)
@@ -42,7 +42,7 @@ export async function POST(request: Request, context: RouteContext) {
   const entry = await prisma.employeeExpense.findFirst({
     where: {
       id: expenseId,
-      businessId: business.id
+      businessId
     },
     include: {
       employee: {
@@ -80,7 +80,7 @@ export async function POST(request: Request, context: RouteContext) {
     let transactionId = freshEntry.transactionId;
     if (!transactionId) {
       const transaction = await postEmployeeExpenseTransaction(tx, {
-        businessId: business.id,
+        businessId,
         expenseId: freshEntry.id,
         employeeName: `${freshEntry.employee.firstName} ${freshEntry.employee.lastName}`.trim(),
         expenseDate: paidDate,

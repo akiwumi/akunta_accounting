@@ -1,7 +1,7 @@
 # Akunta SaaS Phased Build Implementation Plan
 
 Date: 2026-04-06  
-Product: Akunta (Accounting SaaS for Sweden first, EU/UK expansion)
+Product: Akunta (Accounting SaaS with country-dependent tax setup for UK/EU + configurable global mode)
 
 ## 1) Product Decisions Locked
 
@@ -10,6 +10,8 @@ Product: Akunta (Accounting SaaS for Sweden first, EU/UK expansion)
 3. Design and UX are mobile-first and optimized for small screens.
 4. Hosting frontend on Vercel.
 5. Database route is PostgreSQL, using Supabase managed Postgres.
+6. Country and tax setup is user-location-dependent and user-selectable.
+7. The app must not default to Sweden for new organizations.
 
 ## 2) Recommended Production Stack
 
@@ -92,6 +94,9 @@ NEXT_PUBLIC_SENTRY_DSN=https://...
 NEXT_PUBLIC_ENABLE_LOCALE_AUTODETECT=true
 NEXT_PUBLIC_TRANSLATION_MODE=browser
 SUPPORTED_APP_LOCALES=en-GB,sv-SE,de-DE,fr-FR,es-ES,it-IT,nl-NL,pl-PL,pt-PT,da-DK,fi-FI,no-NO
+NEXT_PUBLIC_COUNTRY_DETECTION_MODE=auto
+NEXT_PUBLIC_DEFAULT_COUNTRY=none
+SUPPORTED_TAX_COUNTRIES=GB,AT,BE,BG,HR,CY,CZ,DK,EE,FI,FR,DE,GR,HU,IE,IT,LV,LT,LU,MT,NL,PL,PT,RO,SK,SI,ES,SE
 DEEPL_API_KEY=optional-for-dynamic-content
 DEEPL_API_URL=https://api-free.deepl.com/v2
 
@@ -99,7 +104,7 @@ DEEPL_API_URL=https://api-free.deepl.com/v2
 NEXT_PUBLIC_SITE_URL=https://akunta.com
 SUPPORT_CONTACT_EMAIL=support@akunta.com
 SUPPORT_FORM_RECIPIENT=support@akunta.com
-RESOURCES_DEFAULT_COUNTRY=SE
+RESOURCES_DEFAULT_COUNTRY=AUTO
 ```
 
 ## 5) Target Repository Structure
@@ -392,18 +397,25 @@ This section is the as-built feature inventory from the current codebase and mus
 ## 14.2) Dashboard and Historical Year Controls
 
 1. Closed tax-year selector based on configurable fiscal year start month.
-2. KPI cards for:
+2. KPI cards (P&L and VAT grid):
    1. Revenue
    2. Expenses
    3. Operating profit
    4. Estimated VAT payable
    5. Running output VAT
    6. Running input VAT
-3. Activity counters:
+3. Tax Return Estimate section (dedicated card with estimation disclaimer):
+   1. Estimated annual tax (`totalEstimatedTax`)
+   2. Estimated monthly preliminary F-tax (`preliminaryFTaxMonthly`)
+   3. F-tax paid this year (derived from debit movements on account 1630 for the selected period)
+   4. Estimated tax balance = F-tax paid − estimated total tax (positive = expected refund, negative = additional payment due)
+   5. Disclaimer: "These figures are a potential estimation only. Actual tax liability may differ."
+   6. Link to full interactive Tax Return Estimate page
+4. Activity counters:
    1. Transactions posted
    2. Receipts stored
-4. Historical annual books workflow messaging.
-5. Dashboard-level "Export Full Accounts (Excel)" action.
+5. Historical annual books workflow messaging.
+6. Dashboard-level "Export Full Accounts (Excel)" action.
 
 ## 14.3) Receipts Capture, OCR, and Review Workflow
 
@@ -572,7 +584,14 @@ This section is the as-built feature inventory from the current codebase and mus
    6. Tax year start month (custom month-to-month fiscal period)
    7. Swedish registration fields (SNI, VAT number, F-skatt, personnummer)
    8. Invoice defaults (number pattern, sender profile, default logo/signature, email-from)
-   9. Tax projection rates (municipal tax, social contributions, deduction rate)
+   9. Tax estimation settings including:
+      1. Municipal/local income tax
+      2. National/state income tax + threshold
+      3. Self-employed social contribution rates
+      4. Deduction and contribution caps
+      5. Public service and optional church/burial fees
+      6. VAT standard and reduced rates
+   10. Dedicated tax return estimate section with editable assumptions and editable line-by-line calculation outputs
 2. Local settings persistence fallback file is in use for robustness when needed.
 
 ## 15) Feature Carry-Forward Mapping Into SaaS Phases
@@ -822,3 +841,111 @@ Integrate new scope into existing phases as follows:
 6. Help, Support, Blog, and Resources pages are live and mobile-optimized.
 7. Resources are country-aware and user-overridable.
 8. Akunta branding is consistent on every page.
+
+## 16.11) Country Resolution and No-Default Rule
+
+1. Do not default new organizations to Sweden.
+2. Resolve active country in this order:
+   1. Explicit country selected in organization settings.
+   2. Country captured at onboarding confirmation step.
+   3. Billing country from Stripe customer profile (if present).
+   4. Browser/OS locale and timezone inference.
+   5. If still unresolved, require user selection before enabling tax settings.
+3. Persist metadata:
+   1. `country_code`
+   2. `country_resolution_source`
+   3. `tax_profile_template_version`
+   4. `last_country_confirmed_at`
+4. Changing country after transactions exist must trigger a migration wizard:
+   1. Keep prior tax-year calculations immutable.
+   2. Apply new country template only from a user-selected effective date.
+
+## 16.12) Tax Settings Option Packs (All UK/EU Countries)
+
+Every UK/EU country profile must expose this core configurable option set in Settings:
+
+1. Identity and registration:
+   1. Personal tax ID label + value.
+   2. Business registration ID label + value.
+   3. VAT ID label + value.
+2. Tax year and filing:
+   1. Tax year start and end month.
+   2. Filing frequency (monthly, quarterly, annual).
+   3. Payment due-day rules per filing type.
+3. Indirect tax (VAT/sales tax):
+   1. Standard rate.
+   2. Up to three reduced rates.
+   3. Zero/exempt treatment toggles.
+   4. Registration threshold.
+   5. Cash vs accrual VAT accounting mode.
+   6. Reverse-charge handling (including EU intra-community rules where applicable).
+   7. OSS/IOSS toggle where applicable.
+4. Direct tax estimation:
+   1. Progressive band model (editable brackets and rates).
+   2. Flat-rate override model (for jurisdictions that prefer a simple estimate).
+   3. Local/municipal/regional surcharge toggle and rate.
+   4. National/state surcharge toggle and threshold.
+   5. Prepayment scheduling (monthly or periodic installments).
+5. Self-employed and social contributions:
+   1. Contribution bands and rates.
+   2. Deduction rules and caps.
+   3. Pension contribution settings and caps.
+6. Payroll-linked options (if payroll enabled):
+   1. Employer contribution rates.
+   2. Employee withholding defaults.
+   3. Statutory pension contribution defaults.
+7. Reporting and documents:
+   1. Required statement templates by country.
+   2. Country-specific labels and glossary terms.
+   3. Return estimate explanation panel showing formula steps.
+
+## 16.13) UK + EU Country Template Matrix (Initial Rollout)
+
+The first production rollout must include country templates for all EU member states plus the UK.
+Each template maps to the shared option packs in Section 16.12 and enables country-specific toggles and labels.
+
+| Country | Code | Template Family | Country-Specific Toggles to Enable |
+|---|---|---|---|
+| United Kingdom | GB | UK | Income tax bands, Class 2/4 self-employed contributions, VAT schemes, MTD-ready reporting labels |
+| Austria | AT | EU-Central | Progressive income bands, social contribution estimator, VAT reduced-rate presets |
+| Belgium | BE | EU-West | Progressive bands, social contribution presets, municipal surcharge toggle |
+| Bulgaria | BG | EU-Flat | Flat-tax mode preset, social contribution bands, VAT standard/reduced presets |
+| Croatia | HR | EU-South | Progressive bands, surtax toggle, VAT reduced-rate presets |
+| Cyprus | CY | EU-Med | Progressive bands, social insurance toggles, VAT scheme presets |
+| Czechia | CZ | EU-Central | Progressive bands, social contributions, VAT control statement labels |
+| Denmark | DK | Nordic | Municipal + state split labels, labor-market contribution toggle, VAT single-rate default |
+| Estonia | EE | Baltic | Flat/progressive switch, social tax toggles, VAT presets |
+| Finland | FI | Nordic | State + municipal model, pension/social contribution options, VAT reduced-rate presets |
+| France | FR | EU-West | Progressive bands, social contribution packs, micro-regime toggle |
+| Germany | DE | DACH | Progressive bands, solidarity/church toggles, trade-tax estimator toggle |
+| Greece | GR | EU-South | Progressive bands, solidarity levy toggle, VAT island/reduced labels |
+| Hungary | HU | EU-Flat | Flat-rate preset, social contribution toggles, local business tax toggle |
+| Ireland | IE | EU-West | Progressive bands, USC/PRSI-style contribution labels, VAT presets |
+| Italy | IT | EU-South | National + regional + municipal layers, social contribution packs, split-payment toggle |
+| Latvia | LV | Baltic | Progressive bands, social contribution toggles, VAT presets |
+| Lithuania | LT | Baltic | Progressive/flat mix presets, social contribution toggles, VAT presets |
+| Luxembourg | LU | Benelux | Progressive bands, social contribution presets, VAT multi-rate presets |
+| Malta | MT | EU-Med | Progressive bands, social security toggles, VAT preset rates |
+| Netherlands | NL | Benelux | Box-style income estimation labels, social premiums, VAT small-business scheme toggle |
+| Poland | PL | EU-Central | Progressive/flat options, social contribution presets, split-payment VAT toggle |
+| Portugal | PT | EU-South | Progressive bands, social security presets, simplified regime toggle |
+| Romania | RO | EU-Flat | Flat/progressive mode, social contributions, micro-enterprise toggle labels |
+| Slovakia | SK | EU-Central | Progressive bands, social contribution toggles, VAT control statement labels |
+| Slovenia | SI | EU-Central | Progressive bands, social contribution presets, normirani mode toggle |
+| Spain | ES | EU-South | Progressive IRPF-style labels, social contribution packs, VAT SII toggle |
+| Sweden | SE | Nordic-SE | Municipal/state model, egenavgifter, general deduction, F-skatt monthly estimate |
+
+## 16.14) Phase Updates for Country-Dependent Delivery
+
+1. Phase 1:
+   1. Add onboarding country confirmation step before tax setup.
+   2. Persist country resolution metadata and allow manual override.
+2. Phase 2:
+   1. Implement template loader for all codes in Section 16.13.
+   2. Add template versioning so tax changes can be applied without rewriting old years.
+3. Phase 5:
+   1. Make tax return estimate and exports country-aware with editable line-by-line assumptions.
+   2. Include formula trace output in UI and PDF/Excel exports.
+4. Phase 8:
+   1. Add regression tests per template family (UK, Nordic, DACH, Benelux, EU-Central, EU-South, Baltic, EU-Flat).
+   2. Verify no new organization lands on a hard-coded Sweden profile.

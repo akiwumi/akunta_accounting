@@ -37,17 +37,47 @@ export const metadata: Metadata = {
   }
 };
 
+// Routes that render inside the authenticated app shell (AppNav + PageSubNav)
+const APP_SHELL_PREFIXES = [
+  "/dashboard",
+  "/receipts",
+  "/invoices",
+  "/transactions",
+  "/ledger",
+  "/reports",
+  "/imports",
+  "/assets",
+  "/mileage",
+  "/periodiseringsfond",
+  "/salaries",
+  "/compliance",
+  "/review",
+  "/settings"
+];
+
+function isAppShellRoute(pathname: string): boolean {
+  return APP_SHELL_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
+function isAuthRoute(pathname: string): boolean {
+  return pathname.startsWith("/login") || pathname.startsWith("/register") || pathname.startsWith("/sign-in");
+}
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   const locale = getRequestLocale();
   const pathname = headers().get("x-pathname") ?? "/";
-  const isLoginRoute = pathname.startsWith("/login");
+
+  const authRoute = isAuthRoute(pathname);
+  const appShell = isAppShellRoute(pathname);
 
   return (
     <html lang={locale} className={`${manrope.variable} ${notoSerif.variable} ${inter.variable}`}>
-      <body className={isLoginRoute ? "authRouteBody" : undefined}>
-        {isLoginRoute ? (
+      <body className={authRoute ? "authRouteBody" : undefined}>
+        {authRoute ? (
           <main className="authRouteMain routeFade">{children}</main>
-        ) : (
+        ) : appShell ? (
           <div className="appShell routeFade">
             <AppNav locale={locale} />
             <div className="appMain">
@@ -55,6 +85,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <main className="container routeFade">{children}</main>
             </div>
           </div>
+        ) : (
+          // Public pages — no app chrome
+          <main className="publicMain routeFade">{children}</main>
         )}
       </body>
     </html>

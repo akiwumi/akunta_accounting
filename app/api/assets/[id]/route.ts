@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -18,12 +18,12 @@ const updateSchema = z.object({
 });
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const body = await request.json();
   const payload = updateSchema.parse(body);
 
   const existing = await prisma.fixedAsset.findFirst({
-    where: { id: params.id, businessId: business.id }
+    where: { id: params.id, businessId }
   });
   if (!existing) {
     return NextResponse.json({ error: "Asset not found." }, { status: 404 });
@@ -47,9 +47,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const existing = await prisma.fixedAsset.findFirst({
-    where: { id: params.id, businessId: business.id }
+    where: { id: params.id, businessId }
   });
   if (!existing) {
     return NextResponse.json({ error: "Asset not found." }, { status: 404 });

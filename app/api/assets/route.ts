@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -20,22 +20,22 @@ const createSchema = z.object({
 });
 
 export async function GET() {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const assets = await prisma.fixedAsset.findMany({
-    where: { businessId: business.id },
+    where: { businessId },
     orderBy: { acquisitionDate: "desc" }
   });
   return NextResponse.json(assets);
 }
 
 export async function POST(request: Request) {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const body = await request.json();
   const payload = createSchema.parse(body);
 
   const asset = await prisma.fixedAsset.create({
     data: {
-      businessId: business.id,
+      businessId,
       description: payload.description,
       category: payload.category,
       acquisitionDate: new Date(payload.acquisitionDate),

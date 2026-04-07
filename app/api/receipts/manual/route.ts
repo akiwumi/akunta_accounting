@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { createCashMethodTransaction } from "@/lib/accounting/posting";
 import { asNumber, round2 } from "@/lib/accounting/math";
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { supportsReceiptItemPurchasedField } from "@/lib/data/receiptItemSupport";
 import { prisma } from "@/lib/db";
 import { EntrySources, TransactionDirections } from "@/lib/domain/enums";
@@ -25,7 +25,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const canUseItemPurchased = await supportsReceiptItemPurchasedField();
   const payload = manualReceiptSchema.parse(await request.json());
 
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
   const receipt = await prisma.receipt.create({
     data: {
-      businessId: business.id,
+      businessId,
       source: "manual",
       originalFileName: `manual-${payload.receiptDate}.txt`,
       mimeType: "text/manual",
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
   });
 
   const transaction = await createCashMethodTransaction({
-    businessId: business.id,
+    businessId,
     txnDate,
     description,
     direction,

@@ -1,37 +1,74 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { AUTH_COOKIE_NAME, isAuthenticatedToken } from "@/lib/auth/session";
+import { AUTH_COOKIE_NAME } from "@/lib/auth/constants";
 
-const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
+// Auth entry points — redirect to /dashboard if already logged in
+const AUTH_ROUTES = ["/login", "/register", "/sign-in"];
 
-const isPublicRoute = (pathname: string) =>
-  PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+// Public API routes — no session required
+const PUBLIC_API_ROUTES = [
+  "/api/auth/login",
+  "/api/auth/logout",
+  "/api/auth/register",
+  "/api/health",
+  "/api/support"
+];
 
-const withPathHeader = (request: NextRequest) => {
+// Public site routes — no session required, available to anyone
+const PUBLIC_SITE_PREFIXES = ["/", "/blog", "/help", "/support", "/resources"];
+
+function isAuthRoute(pathname: string): boolean {
+  return AUTH_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+}
+
+function isPublicApiRoute(pathname: string): boolean {
+  return PUBLIC_API_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+}
+
+function isPublicSiteRoute(pathname: string): boolean {
+  // Exact "/" or anything under public site prefixes (but not /api/* which is handled separately)
+  if (pathname === "/") return true;
+  return PUBLIC_SITE_PREFIXES.filter((p) => p !== "/").some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  );
+}
+
+const withPathHeader = (request: NextRequest, response?: NextResponse) => {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-pathname", request.nextUrl.pathname);
-  return NextResponse.next({
-    request: {
-      headers: requestHeaders
-    }
-  });
+  if (response) return response;
+  return NextResponse.next({ request: { headers: requestHeaders } });
 };
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const hasSession = isAuthenticatedToken(request.cookies.get(AUTH_COOKIE_NAME)?.value);
+  // Session token presence check only — full DB validation happens in route handlers.
+  // No DB calls at the edge.
+  const hasSessionCookie = Boolean(request.cookies.get(AUTH_COOKIE_NAME)?.value);
 
-  if (isPublicRoute(pathname)) {
-    if (pathname === "/login" && hasSession) {
+  // Public API — always allow
+  if (isPublicApiRoute(pathname)) {
+    return withPathHeader(request);
+  }
+
+  // Auth routes (/login, /register, /sign-in) — redirect to dashboard if already logged in
+  if (isAuthRoute(pathname)) {
+    if (hasSessionCookie) {
       const url = request.nextUrl.clone();
-      url.pathname = "/";
+      url.pathname = "/dashboard";
       return NextResponse.redirect(url);
     }
     return withPathHeader(request);
   }
 
-  if (!hasSession) {
+  // Public site pages — always allow, no redirect
+  if (isPublicSiteRoute(pathname)) {
+    return withPathHeader(request);
+  }
+
+  // Everything else requires a session
+  if (!hasSessionCookie) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 });
     }
@@ -44,6 +81,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Exclude Next.js static internals and all file-like requests from middleware.
   matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"]
 };

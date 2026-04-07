@@ -3,34 +3,52 @@ import { NextResponse } from "next/server";
 import {
   AUTH_COOKIE_MAX_AGE_SECONDS,
   AUTH_COOKIE_NAME,
-  AUTH_SESSION_TOKEN,
-  verifyLoginCredentials
+  createSession,
+  getUserBusinessId,
+  verifyUserCredentials
 } from "@/lib/auth/session";
-
-type LoginPayload = {
-  username?: unknown;
-  password?: unknown;
-};
-
-const asString = (value: unknown) => (typeof value === "string" ? value : "");
+import { getClientIp, rateLimit } from "@/lib/security/rateLimit";
 
 export async function POST(request: Request) {
-  let payload: LoginPayload = {};
+  const ip = getClientIp(request);
+  const rl = rateLimit({ key: `login:${ip}`, limit: 10, windowSeconds: 60 });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many login attempts. Please wait before trying again." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000)) }
+      }
+    );
+  }
+  let payload: { email?: unknown; password?: unknown } = {};
   try {
-    payload = (await request.json()) as LoginPayload;
+    payload = (await request.json()) as typeof payload;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const username = asString(payload.username);
-  const password = asString(payload.password);
+  const email = typeof payload.email === "string" ? payload.email.trim() : "";
+  const password = typeof payload.password === "string" ? payload.password : "";
 
-  if (!verifyLoginCredentials(username, password)) {
+  if (!email || !password) {
+    return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
+  }
+
+  const user = await verifyUserCredentials(email, password);
+  if (!user) {
     return NextResponse.json({ error: "Invalid login credentials." }, { status: 401 });
   }
 
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set(AUTH_COOKIE_NAME, AUTH_SESSION_TOKEN, {
+  const businessId = await getUserBusinessId(user.id);
+  if (!businessId) {
+    return NextResponse.json({ error: "No business found for this account." }, { status: 403 });
+  }
+
+  const token = await createSession(user.id, businessId);
+
+  const response = NextResponse.json({ ok: true, userId: user.id });
+  response.cookies.set(AUTH_COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

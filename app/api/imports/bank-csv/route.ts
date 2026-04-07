@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
 import {
-  createCashMethodTransaction,
   normalizeGrossAmount,
   parseDirectionFromAmount
 } from "@/lib/accounting/posting";
-import { ensureBusiness } from "@/lib/data/business";
+import { createTransaction } from "@/lib/accounting/posting-dispatcher";
+import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 import { EntrySources } from "@/lib/domain/enums";
 import { parseBankCsv } from "@/lib/imports/bankCsv";
@@ -15,7 +15,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const business = await ensureBusiness();
+  let businessId: string;
+  try {
+    ({ businessId } = await requireAuthContext());
+  } catch {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
 
   const formData = await request.formData();
   const file = formData.get("file");
@@ -28,7 +33,7 @@ export async function POST(request: Request) {
 
   const batch = await prisma.bankImportBatch.create({
     data: {
-      businessId: business.id,
+      businessId,
       fileName: file.name,
       importedRows: parsedRows.length,
       acceptedRows: 0,
@@ -51,8 +56,8 @@ export async function POST(request: Request) {
     try {
       const direction = parseDirectionFromAmount(row.amount);
       const category = normalizeReceiptCategory(row.category);
-      const transaction = await createCashMethodTransaction({
-        businessId: business.id,
+      const transaction = await createTransaction({
+        businessId,
         txnDate: row.txnDate,
         description: row.description,
         direction,
@@ -63,6 +68,20 @@ export async function POST(request: Request) {
         currency: row.currency,
         incomeAccountCode: "3001",
         expenseAccountCode: accountCodeForCategory(category, direction)
+      });
+
+      // Save a BankStatementLine for reconciliation tracking
+      await prisma.bankStatementLine.create({
+        data: {
+          businessId,
+          txnDate: row.txnDate,
+          description: row.description,
+          amount: row.amount,
+          currency: row.currency,
+          externalId: `CSV:${file.name}:row:${row.rowNumber}`,
+          matchedTransactionId: transaction.id,
+          status: "MATCHED"
+        }
       });
 
       acceptedRows += 1;

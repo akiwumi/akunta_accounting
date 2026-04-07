@@ -130,13 +130,21 @@ export const ReceiptUploadForm = ({
 
   return (
     <form className="stack" onSubmit={onSubmit}>
-      <div className="row">
-        <input
-          id="receipt-file"
-          type="file"
-          accept="image/*,application/pdf"
-          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-        />
+      <div className="receiptUploadRow">
+        {/* capture="environment" opens the rear camera on mobile for direct photo */}
+        <label className="receiptFileLabel">
+          <input
+            id="receipt-file"
+            type="file"
+            accept="image/*,application/pdf"
+            capture="environment"
+            className="receiptFileInput"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          />
+          <span className="receiptFileButton">
+            {file ? file.name : (locale === "sv" ? "Välj fil eller foto" : "Choose file or photo")}
+          </span>
+        </label>
         <button type="submit" disabled={!file || submitting}>
           {submitting ? t.processing : t.upload}
         </button>

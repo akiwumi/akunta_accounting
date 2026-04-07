@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { ensureBusiness } from "@/lib/data/business";
+import { requireAuthContext } from "@/lib/auth/context";
 import { loadInvoiceForOutput } from "@/lib/invoices/load";
 import { buildInvoicePdf } from "@/lib/invoices/pdf";
 
@@ -25,9 +25,9 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing invoice id." }, { status: 400 });
   }
 
-  const business = await ensureBusiness();
+  const { businessId } = await requireAuthContext();
   const invoice = await loadInvoiceForOutput({
-    businessId: business.id,
+    businessId,
     invoiceId
   });
 
