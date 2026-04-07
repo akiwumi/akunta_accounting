@@ -7,23 +7,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Auth & Tenancy ─────────────────────────────────────────────────────────
-
 model User {
-  id                      String    @id @default(cuid())
-  email                   String    @unique
-  passwordHash            String?
-  fullName                String?
-  bankIdSubject           String?   @unique
-  isActive                Boolean   @default(true)
-  emailVerificationToken  String?   @unique
-  emailVerifiedAt         DateTime?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
-
-  memberships   Membership[]
-  sessions      Session[]
-  auditLogs     AuditLog[]
+  id                     String       @id @default(cuid())
+  email                  String       @unique
+  passwordHash           String?
+  fullName               String?
+  isActive               Boolean      @default(true)
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  bankIdSubject          String?      @unique
+  emailVerificationToken String?      @unique
+  emailVerifiedAt        DateTime?
+  auditLogs              AuditLog[]
+  memberships            Membership[]
+  sessions               Session[]
 }
 
 model Membership {
@@ -32,9 +29,8 @@ model Membership {
   businessId String
   role       String   @default("owner")
   createdAt  DateTime @default(now())
-
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, businessId])
   @@index([businessId])
@@ -47,13 +43,10 @@ model Session {
   tokenHash  String   @unique
   expiresAt  DateTime
   createdAt  DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
-
-// ─── Compliance & Audit ──────────────────────────────────────────────────────
 
 model AuditLog {
   id         String   @id @default(cuid())
@@ -65,9 +58,8 @@ model AuditLog {
   beforeJson String?
   afterJson  String?
   createdAt  DateTime @default(now())
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user       User?    @relation(fields: [userId], references: [id])
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, entityType])
   @@index([businessId, createdAt])
@@ -80,8 +72,7 @@ model PeriodLock {
   periodEnd      DateTime
   lockedAt       DateTime @default(now())
   lockedByUserId String?
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
 }
@@ -99,8 +90,7 @@ model Filing {
   submittedAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, filingType])
   @@index([businessId, status])
@@ -116,13 +106,10 @@ model TaxEvent {
   detail     String?
   eventDate  DateTime?
   createdAt  DateTime  @default(now())
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, eventDate])
 }
-
-// ─── Reconciliation ──────────────────────────────────────────────────────────
 
 model BankStatementLine {
   id                   String    @id @default(cuid())
@@ -136,83 +123,74 @@ model BankStatementLine {
   matchedTransactionId String?
   status               String    @default("UNMATCHED")
   createdAt            DateTime  @default(now())
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business             Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, status])
   @@index([businessId, txnDate])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 model Business {
-  id                String       @id @default(cuid())
-  name              String
-  orgType           String       @default("sole_trader")
-  jurisdiction      String       @default("SWEDEN")
-  bookkeepingMethod String       @default("kontantmetoden")
-  vatRegistered     Boolean      @default(true)
-  vatFrequency      String       @default("yearly")
-  fiscalYearStart   DateTime
-  baseCurrency      String       @default("SEK")
-  locale            String       @default("en")
-  // Swedish registration fields
-  sniCode           String?
-  vatNumber         String?
-  fSkattRegistered  Boolean      @default(true)
-  personnummer      String?
-  invoiceNumberPattern   String   @default("INV-{YYYY}-{SEQ:4}")
-  nextInvoiceSequence    Int      @default(1)
-  invoiceSenderName      String?
-  invoiceSenderAddress   String?
-  invoiceSenderOrgNumber String?
-  invoiceSenderEmail     String?
-  invoiceSenderPhone     String?
-  invoiceSenderWebsite   String?
-  invoiceDefaultLogo     String?
-  invoiceDefaultSignature String?
-  invoiceEmailFrom       String?
-  // Swedish authority integration fields
-  skvActorId             String?
-  skvAuthorizationStatus String?
-  bankgiro               String?
-  plusgiro               String?
-  peppolId               String?
-  // Country resolution metadata (Phase 11)
-  countryCode                 String?   // ISO 3166-1 alpha-2, e.g. "SE", "GB", "DE"
-  countryResolutionSource     String?   // "explicit" | "onboarding" | "stripe" | "locale" | "unresolved"
-  taxProfileTemplateVersion   String?   // semver of the template applied, e.g. "1.0.0"
-  lastCountryConfirmedAt      DateTime?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-
-  taxConfig            TaxConfig?
-  countryTaxProfile    CountryTaxProfile?
-  accounts             Account[]
-  receipts             Receipt[]
-  invoices             Invoice[]
-  customers            Customer[]
-  transactions         Transaction[]
-  bankImports          BankImportBatch[]
-  fixedAssets          FixedAsset[]
-  mileageEntries       MileageEntry[]
-  periodisationEntries PeriodisationEntry[]
-  employees            Employee[]
-  salaryEntries        SalaryEntry[]
-  employeeExpenses     EmployeeExpense[]
-  memberships          Membership[]
-  auditLogs            AuditLog[]
-  periodLocks          PeriodLock[]
-  filings              Filing[]
-  taxEvents            TaxEvent[]
-  bankStatementLines   BankStatementLine[]
-  subscriptions        Subscription[]
-  payslips             Payslip[]
-  employerDeclarations EmployerDeclaration[]
-  openingBalances      OpeningBalance[]
+  id                        String                @id @default(cuid())
+  name                      String
+  orgType                   String                @default("sole_trader")
+  jurisdiction              String                @default("SWEDEN")
+  bookkeepingMethod         String                @default("kontantmetoden")
+  vatRegistered             Boolean               @default(true)
+  vatFrequency              String                @default("yearly")
+  fiscalYearStart           DateTime
+  baseCurrency              String                @default("SEK")
+  locale                    String                @default("en")
+  invoiceNumberPattern      String                @default("INV-{YYYY}-{SEQ:4}")
+  nextInvoiceSequence       Int                   @default(1)
+  invoiceSenderName         String?
+  invoiceSenderAddress      String?
+  invoiceSenderOrgNumber    String?
+  invoiceSenderEmail        String?
+  invoiceSenderPhone        String?
+  invoiceSenderWebsite      String?
+  invoiceDefaultLogo        String?
+  invoiceDefaultSignature   String?
+  invoiceEmailFrom          String?
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+  sniCode                   String?
+  vatNumber                 String?
+  fSkattRegistered          Boolean               @default(true)
+  personnummer              String?
+  bankgiro                  String?
+  peppolId                  String?
+  plusgiro                  String?
+  skvActorId                String?
+  skvAuthorizationStatus    String?
+  countryCode               String?
+  countryResolutionSource   String?
+  lastCountryConfirmedAt    DateTime?
+  taxProfileTemplateVersion String?
+  accounts                  Account[]
+  auditLogs                 AuditLog[]
+  bankImports               BankImportBatch[]
+  bankStatementLines        BankStatementLine[]
+  countryTaxProfile         CountryTaxProfile?
+  customers                 Customer[]
+  employees                 Employee[]
+  employeeExpenses          EmployeeExpense[]
+  employerDeclarations      EmployerDeclaration[]
+  filings                   Filing[]
+  fixedAssets               FixedAsset[]
+  invoices                  Invoice[]
+  memberships               Membership[]
+  mileageEntries            MileageEntry[]
+  openingBalances           OpeningBalance[]
+  payslips                  Payslip[]
+  periodLocks               PeriodLock[]
+  periodisationEntries      PeriodisationEntry[]
+  receipts                  Receipt[]
+  salaryEntries             SalaryEntry[]
+  subscriptions             Subscription?
+  taxConfig                 TaxConfig?
+  taxEvents                 TaxEvent[]
+  transactions              Transaction[]
 }
-
-// ─── Billing ─────────────────────────────────────────────────────────────────
 
 model Subscription {
   id                   String    @id @default(cuid())
@@ -228,13 +206,10 @@ model Subscription {
   trialEndsAt          DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business             Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
 }
-
-// ─── Payroll compliance ───────────────────────────────────────────────────────
 
 model Payslip {
   id              String   @id @default(cuid())
@@ -252,8 +227,7 @@ model Payslip {
   netSalary       Decimal
   pdfKey          String?
   generatedAt     DateTime @default(now())
-
-  business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, paymentDate])
   @@index([employeeId])
@@ -274,117 +248,93 @@ model EmployerDeclaration {
   submittedAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@unique([businessId, periodYear, periodMonth])
   @@index([businessId, status])
 }
 
 model TaxConfig {
-  id                          String   @id @default(cuid())
-  businessId                  String   @unique
-  municipalTaxRate            Decimal  @default(0.32)
-  socialContributionRate      Decimal  @default(0.2897)
-  generalDeductionRate        Decimal  @default(0.25)
-  vatStandardRate             Decimal  @default(0.25)
-  vatReducedRateFood          Decimal  @default(0.12)
-  vatReducedRateCulture       Decimal  @default(0.06)
-  updatedAt                   DateTime @updatedAt
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  id                     String   @id @default(cuid())
+  businessId             String   @unique
+  municipalTaxRate       Decimal  @default(0.32)
+  socialContributionRate Decimal  @default(0.2897)
+  generalDeductionRate   Decimal  @default(0.25)
+  vatStandardRate        Decimal  @default(0.25)
+  vatReducedRateFood     Decimal  @default(0.12)
+  vatReducedRateCulture  Decimal  @default(0.06)
+  updatedAt              DateTime @updatedAt
+  business               Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
-// ─── Country Tax Profile (Phase 11) ─────────────────────────────────────────
-// Stores per-business tax profile overrides loaded from or derived from a country template.
-// One profile per business; income tax bands stored in a child table.
-
 model CountryTaxProfile {
-  id                      String   @id @default(cuid())
-  businessId              String   @unique
-  countryCode             String   // ISO 3166-1 alpha-2
-  templateFamily          String?  // e.g. "Nordic", "DACH", "EU-West"
-  templateVersion         String   @default("1.0.0")
-
-  // Indirect tax (VAT / sales tax)
-  vatStandardRate         Decimal  @default(0.25)
-  vatReducedRate1         Decimal?
-  vatReducedRate2         Decimal?
-  vatReducedRate3         Decimal?
-  vatRegistrationThreshold Decimal?
-  vatCashAccounting       Boolean  @default(false)
-  ossEnabled              Boolean  @default(false)
-  reverseChargeEnabled    Boolean  @default(false)
-
-  // Filing
-  taxYearStartMonth       Int      @default(1)
-  taxYearEndMonth         Int      @default(12)
-  vatFilingFrequency      String   @default("yearly")   // "monthly"|"quarterly"|"yearly"
-  vatPaymentDueDays       Int      @default(30)
-
-  // Direct tax estimation
-  incomeTaxMode           String   @default("flat")     // "progressive"|"flat"
-  flatIncomeTaxRate       Decimal?
-  municipalSurchargeRate  Decimal?
-  nationalSurchargeRate   Decimal?
+  id                         String          @id @default(cuid())
+  businessId                 String          @unique
+  countryCode                String
+  templateFamily             String?
+  templateVersion            String          @default("1.0.0")
+  vatStandardRate            Decimal         @default(0.25)
+  vatReducedRate1            Decimal?
+  vatReducedRate2            Decimal?
+  vatReducedRate3            Decimal?
+  vatRegistrationThreshold   Decimal?
+  vatCashAccounting          Boolean         @default(false)
+  ossEnabled                 Boolean         @default(false)
+  reverseChargeEnabled       Boolean         @default(false)
+  taxYearStartMonth          Int             @default(1)
+  taxYearEndMonth            Int             @default(12)
+  vatFilingFrequency         String          @default("yearly")
+  vatPaymentDueDays          Int             @default(30)
+  incomeTaxMode              String          @default("flat")
+  flatIncomeTaxRate          Decimal?
+  municipalSurchargeRate     Decimal?
+  nationalSurchargeRate      Decimal?
   nationalSurchargeThreshold Decimal?
-
-  // Self-employed / social contributions
-  socialContributionRate  Decimal  @default(0)
-  socialContributionCap   Decimal?
-  pensionContributionRate Decimal  @default(0)
-  pensionContributionCap  Decimal?
-  generalDeductionRate    Decimal  @default(0)
-
-  // Payroll (if enabled)
-  employerContributionRate Decimal @default(0)
-  employeeWithholdingRate  Decimal @default(0)
-
-  // Identity labels (for UI customisation)
-  personalTaxIdLabel      String?
-  businessRegIdLabel      String?
-  vatIdLabel              String?
-  socialContribLabel      String?
-
-  // Custom fields as JSON (non-UK/EU territories)
-  customFieldsJson        String?
-
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-
-  business                Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  incomeTaxBands          IncomeTaxBand[]
+  socialContributionRate     Decimal         @default(0)
+  socialContributionCap      Decimal?
+  pensionContributionRate    Decimal         @default(0)
+  pensionContributionCap     Decimal?
+  generalDeductionRate       Decimal         @default(0)
+  employerContributionRate   Decimal         @default(0)
+  employeeWithholdingRate    Decimal         @default(0)
+  personalTaxIdLabel         String?
+  businessRegIdLabel         String?
+  vatIdLabel                 String?
+  socialContribLabel         String?
+  customFieldsJson           String?
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+  business                   Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  incomeTaxBands             IncomeTaxBand[]
 
   @@index([businessId])
   @@index([countryCode])
 }
 
 model IncomeTaxBand {
-  id              String   @id @default(cuid())
-  profileId       String
-  bandOrder       Int      // 1 = lowest
-  fromAmount      Decimal  // 0 for the first band
-  toAmount        Decimal? // null = no upper limit
-  rate            Decimal
-  label           String?  // e.g. "Basic rate", "Higher rate"
-
-  profile CountryTaxProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  id         String            @id @default(cuid())
+  profileId  String
+  bandOrder  Int
+  fromAmount Decimal
+  toAmount   Decimal?
+  rate       Decimal
+  label      String?
+  profile    CountryTaxProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@index([profileId, bandOrder])
 }
 
 model Account {
-  id          String      @id @default(cuid())
-  businessId  String
-  code        String
-  name        String
-  type        String
-  vatCode     String?
-  isSystem    Boolean     @default(false)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  business        Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  id              String           @id @default(cuid())
+  businessId      String
+  code            String
+  name            String
+  type            String
+  vatCode         String?
+  isSystem        Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  business        Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
   lines           JournalLine[]
   openingBalances OpeningBalance[]
 
@@ -392,108 +342,105 @@ model Account {
 }
 
 model Receipt {
-  id               String   @id @default(cuid())
+  id               String        @id @default(cuid())
   businessId       String
-  source           String   @default("upload")
+  source           String        @default("upload")
   originalFileName String
   mimeType         String
   filePath         String
-  receiptNumber    String?
   vendor           String?
-  itemPurchased    String?
   receiptDate      DateTime?
   grossAmount      Decimal?
   netAmount        Decimal?
   vatAmount        Decimal?
   vatRate          Decimal?
-  currency         String   @default("SEK")
-  sourceCurrency   String?
-  fxRateToSek      Decimal?
-  fxRateDate       DateTime?
+  currency         String        @default("SEK")
   category         String?
   confidence       Decimal?
-  needsReview      Boolean  @default(true)
-  createdAt        DateTime @default(now())
-
-  business      Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  transactions  Transaction[]
+  needsReview      Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  receiptNumber    String?
+  fxRateDate       DateTime?
+  fxRateToSek      Decimal?
+  sourceCurrency   String?
+  itemPurchased    String?
+  business         Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  transactions     Transaction[]
 }
 
 model Transaction {
-  id          String               @id @default(cuid())
-  businessId  String
-  receiptId   String?
-  paidInvoiceId String?            @unique
-  txnDate     DateTime
-  description String
-  direction   String
-  grossAmount Decimal
-  netAmount   Decimal
-  vatAmount   Decimal
-  vatRate     Decimal
-  currency    String               @default("SEK")
-  sourceCurrency String?
-  fxRateToSek Decimal?
-  fxRateDate  DateTime?
-  source      String
-  reference   String?
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
-
-  business Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  receipt  Receipt?     @relation(fields: [receiptId], references: [id], onDelete: SetNull)
-  paidInvoice Invoice?  @relation("InvoicePayment", fields: [paidInvoiceId], references: [id], onDelete: SetNull)
-  lines    JournalLine[]
-  bankImportRows BankImportRow[]
-  salaryEntries SalaryEntry[]
-  employeeExpenses EmployeeExpense[]
-  invoicePayment InvoicePayment? @relation("InvoicePartialPayment")
-  creditNote     CreditNote?     @relation("CreditNoteTransaction")
+  id               String           @id @default(cuid())
+  businessId       String
+  receiptId        String?
+  paidInvoiceId    String?          @unique
+  txnDate          DateTime
+  description      String
+  direction        String
+  grossAmount      Decimal
+  netAmount        Decimal
+  vatAmount        Decimal
+  vatRate          Decimal
+  currency         String           @default("SEK")
+  source           String
+  reference        String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  fxRateDate       DateTime?
+  fxRateToSek      Decimal?
+  sourceCurrency   String?
+  bankImportRows   BankImportRow[]
+  creditNote       CreditNote?      @relation("CreditNoteTransaction")
+  employeeExpenses EmployeeExpense?
+  invoicePayment   InvoicePayment?  @relation("InvoicePartialPayment")
+  lines            JournalLine[]
+  salaryEntries    SalaryEntry?
+  paidInvoice      Invoice?         @relation("InvoicePayment", fields: [paidInvoiceId], references: [id])
+  receipt          Receipt?         @relation(fields: [receiptId], references: [id])
+  business         Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 model Invoice {
-  id            String   @id @default(cuid())
-  businessId     String
-  customerId     String?
-  invoiceNumber  String
-  customerName   String
-  customerEmail  String?
-  customerPhone  String?
-  customerWebsite String?
-  customerAddress String?
-  senderName     String?
-  senderAddress  String?
-  senderOrgNumber String?
-  senderEmail    String?
-  senderPhone    String?
-  senderWebsite  String?
-  projectName    String?
-  issueDate      DateTime
-  dueDate        DateTime?
-  description    String?
-  notes          String?
-  paymentMethod  String?
-  paymentDetails String?
-  logoDataUrl    String?
+  id               String           @id @default(cuid())
+  businessId       String
+  customerId       String?
+  invoiceNumber    String
+  customerName     String
+  customerEmail    String?
+  customerPhone    String?
+  customerWebsite  String?
+  customerAddress  String?
+  senderName       String?
+  senderAddress    String?
+  senderOrgNumber  String?
+  senderEmail      String?
+  senderPhone      String?
+  senderWebsite    String?
+  projectName      String?
+  issueDate        DateTime
+  dueDate          DateTime?
+  description      String?
+  notes            String?
+  paymentMethod    String?
+  paymentDetails   String?
+  logoDataUrl      String?
   signatureDataUrl String?
-  subtotalAmount Decimal  @default(0)
-  vatAmount      Decimal  @default(0)
-  grossAmount    Decimal
-  vatRate        Decimal  @default(0.25)
-  currency       String   @default("SEK")
-  status         String   @default("UNPAID")
-  emailTo        String?
-  sentAt         DateTime?
-  paidAt         DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  business        Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customer        Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  paidTransaction Transaction?      @relation("InvoicePayment")
-  items           InvoiceItem[]
-  payments        InvoicePayment[]
-  creditNotes     CreditNote[]
+  subtotalAmount   Decimal          @default(0)
+  vatAmount        Decimal          @default(0)
+  grossAmount      Decimal
+  vatRate          Decimal          @default(0.25)
+  currency         String           @default("SEK")
+  status           String           @default("UNPAID")
+  emailTo          String?
+  sentAt           DateTime?
+  paidAt           DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  creditNotes      CreditNote[]
+  customer         Customer?        @relation(fields: [customerId], references: [id])
+  business         Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  items            InvoiceItem[]
+  payments         InvoicePayment[]
+  paidTransaction  Transaction?     @relation("InvoicePayment")
 
   @@unique([businessId, invoiceNumber])
   @@index([businessId, issueDate])
@@ -501,7 +448,7 @@ model Invoice {
 }
 
 model Customer {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   businessId   String
   name         String
   email        String?
@@ -513,11 +460,10 @@ model Customer {
   postalCode   String?
   country      String?
   notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  invoices Invoice[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invoices     Invoice[]
 
   @@index([businessId, name])
   @@index([businessId, email])
@@ -537,76 +483,71 @@ model InvoiceItem {
   totalAmount Decimal
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId, sortOrder])
 }
 
 model InvoicePayment {
-  id            String   @id @default(cuid())
+  id            String       @id @default(cuid())
   businessId    String
   invoiceId     String
-  transactionId String?  @unique
+  transactionId String?      @unique
   paymentDate   DateTime
   amount        Decimal
-  currency      String   @default("SEK")
+  currency      String       @default("SEK")
   reference     String?
   notes         String?
-  createdAt     DateTime @default(now())
-
-  invoice     Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  transaction Transaction? @relation("InvoicePartialPayment", fields: [transactionId], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now())
+  transaction   Transaction? @relation("InvoicePartialPayment", fields: [transactionId], references: [id])
+  invoice       Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
   @@index([businessId, paymentDate])
 }
 
 model CreditNote {
-  id              String   @id @default(cuid())
-  businessId      String
-  invoiceId       String
+  id               String       @id @default(cuid())
+  businessId       String
+  invoiceId        String
   creditNoteNumber String
-  issueDate       DateTime
-  amount          Decimal
-  vatAmount       Decimal  @default(0)
-  netAmount       Decimal
-  reason          String?
-  status          String   @default("ISSUED")
-  transactionId   String?  @unique
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  invoice     Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  transaction Transaction? @relation("CreditNoteTransaction", fields: [transactionId], references: [id], onDelete: SetNull)
+  issueDate        DateTime
+  amount           Decimal
+  vatAmount        Decimal      @default(0)
+  netAmount        Decimal
+  reason           String?
+  status           String       @default("ISSUED")
+  transactionId    String?      @unique
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  transaction      Transaction? @relation("CreditNoteTransaction", fields: [transactionId], references: [id])
+  invoice          Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@unique([businessId, creditNoteNumber])
   @@index([businessId, issueDate])
 }
 
 model JournalLine {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   transactionId String
   accountId     String
-  debit         Decimal  @default(0)
-  credit        Decimal  @default(0)
+  debit         Decimal     @default(0)
+  credit        Decimal     @default(0)
   note          String?
-
-  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  account     Account     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  account       Account     @relation(fields: [accountId], references: [id])
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 }
 
 model BankImportBatch {
-  id              String   @id @default(cuid())
-  businessId      String
-  fileName        String
-  importedRows    Int
-  acceptedRows    Int
-  rejectedRows    Int
-  createdAt       DateTime @default(now())
-
-  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  rows     BankImportRow[]
+  id           String          @id @default(cuid())
+  businessId   String
+  fileName     String
+  importedRows Int
+  acceptedRows Int
+  rejectedRows Int
+  createdAt    DateTime        @default(now())
+  business     Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  rows         BankImportRow[]
 }
 
 model FixedAsset {
@@ -622,8 +563,7 @@ model FixedAsset {
   notes              String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business           Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
 }
@@ -639,8 +579,7 @@ model MileageEntry {
   deductionAmount Decimal
   notes           String?
   createdAt       DateTime @default(now())
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, tripDate])
 }
@@ -655,8 +594,7 @@ model PeriodisationEntry {
   notes      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, taxYear])
 }
@@ -669,80 +607,77 @@ model OpeningBalance {
   amount     Decimal  @default(0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  account  Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@unique([businessId, accountId, fiscalYear])
   @@index([businessId, fiscalYear])
 }
 
 model Employee {
-  id                        String   @id @default(cuid())
-  businessId                String
-  employeeNumber            String?
-  firstName                 String
-  lastName                  String
-  email                     String?
-  phone                     String?
-  personalNumber            String
-  addressLine1              String?
-  addressLine2              String?
-  postalCode                String?
-  city                      String?
-  country                   String   @default("SE")
-  taxTable                  String?
-  preliminaryTaxRate        Decimal  @default(0.30)
-  employerContributionRate  Decimal  @default(0.3142)
-  pensionRate               Decimal  @default(0.045)
-  bankAccountName           String?
-  bankClearingNumber        String?
-  bankAccountNumber         String?
-  iban                      String?
-  bic                       String?
-  status                    String   @default("ACTIVE")
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
-
-  business      Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  salaryEntries SalaryEntry[]
-  expenses      EmployeeExpense[]
+  id                       String            @id @default(cuid())
+  businessId               String
+  employeeNumber           String?
+  firstName                String
+  lastName                 String
+  email                    String?
+  phone                    String?
+  personalNumber           String
+  addressLine1             String?
+  addressLine2             String?
+  postalCode               String?
+  city                     String?
+  country                  String            @default("SE")
+  taxTable                 String?
+  preliminaryTaxRate       Decimal           @default(0.30)
+  employerContributionRate Decimal           @default(0.3142)
+  pensionRate              Decimal           @default(0.045)
+  bankAccountName          String?
+  bankClearingNumber       String?
+  bankAccountNumber        String?
+  iban                     String?
+  bic                      String?
+  status                   String            @default("ACTIVE")
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  business                 Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  expenses                 EmployeeExpense[]
+  salaryEntries            SalaryEntry[]
 
   @@index([businessId, status])
   @@index([businessId, lastName, firstName])
 }
 
 model SalaryEntry {
-  id                          String    @id @default(cuid())
-  businessId                  String
-  employeeId                  String
-  payrollDate                 DateTime
-  periodFrom                  DateTime?
-  periodTo                    DateTime?
-  grossSalary                 Decimal
-  bonusAmount                 Decimal   @default(0)
-  overtimeAmount              Decimal   @default(0)
-  benefitsAmount              Decimal   @default(0)
-  taxableGross                Decimal
-  preliminaryTaxRate          Decimal
-  preliminaryTaxAmount        Decimal
-  employerContributionRate    Decimal
-  employerContributionAmount  Decimal
-  pensionRate                 Decimal
-  pensionAmount               Decimal
-  netSalary                   Decimal
-  status                      String    @default("DRAFT")
-  approvedAt                  DateTime?
-  paidAt                      DateTime?
-  paymentReference            String?
-  notes                       String?
-  transactionId               String?   @unique
-  createdAt                   DateTime  @default(now())
-  updatedAt                   DateTime  @updatedAt
-
-  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  id                         String       @id @default(cuid())
+  businessId                 String
+  employeeId                 String
+  payrollDate                DateTime
+  periodFrom                 DateTime?
+  periodTo                   DateTime?
+  grossSalary                Decimal
+  bonusAmount                Decimal      @default(0)
+  overtimeAmount             Decimal      @default(0)
+  benefitsAmount             Decimal      @default(0)
+  taxableGross               Decimal
+  preliminaryTaxRate         Decimal
+  preliminaryTaxAmount       Decimal
+  employerContributionRate   Decimal
+  employerContributionAmount Decimal
+  pensionRate                Decimal
+  pensionAmount              Decimal
+  netSalary                  Decimal
+  status                     String       @default("DRAFT")
+  approvedAt                 DateTime?
+  paidAt                     DateTime?
+  paymentReference           String?
+  notes                      String?
+  transactionId              String?      @unique
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+  transaction                Transaction? @relation(fields: [transactionId], references: [id])
+  employee                   Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  business                   Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, payrollDate])
   @@index([employeeId, payrollDate])
@@ -750,29 +685,28 @@ model SalaryEntry {
 }
 
 model EmployeeExpense {
-  id             String    @id @default(cuid())
-  businessId     String
-  employeeId     String
-  expenseDate    DateTime
-  category       String
-  description    String
-  grossAmount    Decimal
-  vatAmount      Decimal   @default(0)
-  netAmount      Decimal
-  currency       String    @default("SEK")
-  status         String    @default("PENDING")
-  approvedAt     DateTime?
-  paidAt         DateTime?
+  id               String       @id @default(cuid())
+  businessId       String
+  employeeId       String
+  expenseDate      DateTime
+  category         String
+  description      String
+  grossAmount      Decimal
+  vatAmount        Decimal      @default(0)
+  netAmount        Decimal
+  currency         String       @default("SEK")
+  status           String       @default("PENDING")
+  approvedAt       DateTime?
+  paidAt           DateTime?
   receiptReference String?
   paymentReference String?
-  notes          String?
-  transactionId  String?   @unique
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  notes            String?
+  transactionId    String?      @unique
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  transaction      Transaction? @relation(fields: [transactionId], references: [id])
+  employee         Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  business         Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, expenseDate])
   @@index([employeeId, expenseDate])
@@ -780,16 +714,15 @@ model EmployeeExpense {
 }
 
 model BankImportRow {
-  id             String   @id @default(cuid())
-  batchId        String
-  rowNumber      Int
-  txnDate        DateTime
-  description    String
-  amount         Decimal
-  status         String
+  id              String          @id @default(cuid())
+  batchId         String
+  rowNumber       Int
+  txnDate         DateTime
+  description     String
+  amount          Decimal
+  status          String
   rejectionReason String?
-  transactionId  String?
-
-  batch       BankImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  transaction Transaction?    @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  transactionId   String?
+  transaction     Transaction?    @relation(fields: [transactionId], references: [id])
+  batch           BankImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 }
