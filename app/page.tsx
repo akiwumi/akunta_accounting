@@ -122,7 +122,7 @@ export default function LandingPage() {
       {/* ── Features ───────────────────────────────────────────────────── */}
       <section className="publicSection" id="features">
         <div className="publicSectionInner">
-          <h2 className="publicSectionTitle">Everything you need. Nothing you don't.</h2>
+          <h2 className="publicSectionTitle">Everything you need. Nothing you don&apos;t.</h2>
           <div className="publicFeaturesGrid">
             {features.map((f) => (
               <article key={f.icon} className="publicFeatureCard">
