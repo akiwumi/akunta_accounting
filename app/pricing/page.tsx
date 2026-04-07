@@ -23,23 +23,13 @@ const FEATURES = [
 
 const PLANS = [
   {
-    id: "starter",
-    name: "Starter",
-    nameSv: "Starter",
-    tagline: "Perfect for getting started.",
-    taglineSv: "Perfekt för att komma igång.",
-    monthlyPrice: 149,
-    annualPrice: 1490, // 10 months
-    currency: "SEK"
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    nameSv: "Pro",
-    tagline: "For growing businesses.",
-    taglineSv: "För växande verksamheter.",
-    monthlyPrice: 299,
-    annualPrice: 2990, // 10 months
+    id: "akunta",
+    name: "Akunta",
+    nameSv: "Akunta",
+    tagline: "Everything included. One simple price.",
+    taglineSv: "Allt ingår. Ett enkelt pris.",
+    monthlyPrice: 300,
+    annualPrice: 3000, // 10 months — 2 months free
     currency: "SEK",
     highlighted: true
   }
