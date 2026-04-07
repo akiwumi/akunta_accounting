@@ -11,31 +11,38 @@
 import { round2 } from "@/lib/accounting/math";
 import type { TaxEstimateOutput } from "@/lib/tax/types";
 
+// Prisma returns Decimal objects for numeric fields — accept any numeric-like value
+type DecimalLike = number | string | { toNumber(): number } | null;
+
 export type IncomeTaxBandRow = {
-  bandOrder: number;
-  fromAmount: number | string; // Decimal from Prisma may come as string
-  toAmount: number | string | null;
-  rate: number | string;
+  bandOrder: number | string | { toNumber(): number };
+  fromAmount: DecimalLike;
+  toAmount: DecimalLike;
+  rate: DecimalLike;
   label: string | null;
 };
 
 export type CountryTaxProfileRow = {
   countryCode: string;
   incomeTaxMode: string; // "progressive" | "flat"
-  flatIncomeTaxRate: number | string | null;
-  municipalSurchargeRate: number | string | null;
-  nationalSurchargeRate: number | string | null;
-  nationalSurchargeThreshold: number | string | null;
-  socialContributionRate: number | string;
-  socialContributionCap: number | string | null;
-  pensionContributionRate: number | string;
-  pensionContributionCap: number | string | null;
-  generalDeductionRate: number | string;
+  flatIncomeTaxRate: DecimalLike;
+  municipalSurchargeRate: DecimalLike;
+  nationalSurchargeRate: DecimalLike;
+  nationalSurchargeThreshold: DecimalLike;
+  socialContributionRate: DecimalLike;
+  socialContributionCap: DecimalLike;
+  pensionContributionRate: DecimalLike;
+  pensionContributionCap: DecimalLike;
+  generalDeductionRate: DecimalLike;
   incomeTaxBands: IncomeTaxBandRow[];
 };
 
-const n = (v: number | string | null | undefined): number =>
-  v === null || v === undefined ? 0 : typeof v === "string" ? parseFloat(v) : v;
+const n = (v: DecimalLike | undefined): number => {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "object" && "toNumber" in v) return v.toNumber();
+  if (typeof v === "string") return parseFloat(v);
+  return v;
+};
 
 function applyProgressiveBands(
   income: number,
