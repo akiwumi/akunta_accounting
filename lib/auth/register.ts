@@ -147,6 +147,13 @@ export async function handleRegisterRequest(request: Request) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
     }
+    if (error instanceof Prisma.PrismaClientInitializationError) {
+      console.error("Registration database initialization failed:", error);
+      return NextResponse.json(
+        { error: "Registration is temporarily unavailable. Please try again shortly." },
+        { status: 503 }
+      );
+    }
     console.error("Registration provisioning failed:", error);
     return NextResponse.json(
       { error: "Registration is temporarily unavailable. Please try again shortly." },

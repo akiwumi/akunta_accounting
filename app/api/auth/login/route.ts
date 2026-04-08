@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import {
@@ -40,26 +41,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
   }
 
-  const user = await verifyUserCredentials(email, password);
-  if (!user) {
-    return NextResponse.json({ error: "Invalid login credentials." }, { status: 401 });
+  try {
+    const user = await verifyUserCredentials(email, password);
+    if (!user) {
+      return NextResponse.json({ error: "Invalid login credentials." }, { status: 401 });
+    }
+
+    const businessId = await getUserBusinessId(user.id);
+    if (!businessId) {
+      return NextResponse.json({ error: "No business found for this account." }, { status: 403 });
+    }
+
+    const token = await createSession(user.id, businessId);
+
+    const response = NextResponse.json({ ok: true, userId: user.id });
+    response.cookies.set(AUTH_COOKIE_NAME, token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: AUTH_COOKIE_MAX_AGE_SECONDS
+    });
+
+    return response;
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientInitializationError) {
+      console.error("Login database initialization failed:", error);
+      return NextResponse.json(
+        { error: "Sign in is temporarily unavailable. Please try again shortly." },
+        { status: 503 }
+      );
+    }
+
+    console.error("Login request failed:", error);
+    return NextResponse.json(
+      { error: "Sign in failed. Please try again." },
+      { status: 500 }
+    );
   }
-
-  const businessId = await getUserBusinessId(user.id);
-  if (!businessId) {
-    return NextResponse.json({ error: "No business found for this account." }, { status: 403 });
-  }
-
-  const token = await createSession(user.id, businessId);
-
-  const response = NextResponse.json({ ok: true, userId: user.id });
-  response.cookies.set(AUTH_COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: AUTH_COOKIE_MAX_AGE_SECONDS
-  });
-
-  return response;
 }
