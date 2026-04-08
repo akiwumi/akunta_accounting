@@ -47,67 +47,74 @@ export async function resolveOrProvisionBankIdUser(
 
     const businessName = `${fullName}s företag`;
 
-    const result = await prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: {
-          email: placeholderEmail,
-          fullName: fullName.trim(),
-          bankIdSubject: personalNumber,
-          isActive: true,
-        },
-      });
-
-      const newBusiness = await tx.business.create({
-        data: {
-          name: businessName,
-          orgType: "sole_trader",
-          jurisdiction: Jurisdictions.SWEDEN,
-          bookkeepingMethod: "kontantmetoden",
-          vatRegistered: true,
-          vatFrequency: "yearly",
-          fiscalYearStart: new Date(Date.UTC(new Date().getFullYear(), 0, 1)),
-          baseCurrency: "SEK",
-          locale: "sv",
-          invoiceNumberPattern: "INV-{YYYY}-{SEQ:4}",
-          nextInvoiceSequence: 1,
-          invoiceSenderName: businessName,
-          accounts: {
-            create: swedishSoleTraderDefaultAccounts.map((a) => ({
-              code: a.code,
-              name: a.name,
-              type: a.type,
-              vatCode: a.vatCode,
-              isSystem: a.isSystem ?? false,
-            })),
-          },
-          taxConfig: {
-            create: {
-              municipalTaxRate: 0.32,
-              socialContributionRate: 0.2897,
-              generalDeductionRate: 0.25,
-              vatStandardRate: 0.25,
-              vatReducedRateFood: 0.12,
-              vatReducedRateCulture: 0.06,
+    const result = await prisma.user.create({
+      data: {
+        email: placeholderEmail,
+        fullName: fullName.trim(),
+        bankIdSubject: personalNumber,
+        isActive: true,
+        memberships: {
+          create: {
+            role: "owner",
+            business: {
+              create: {
+                name: businessName,
+                orgType: "sole_trader",
+                jurisdiction: Jurisdictions.SWEDEN,
+                bookkeepingMethod: "kontantmetoden",
+                vatRegistered: true,
+                vatFrequency: "yearly",
+                fiscalYearStart: new Date(Date.UTC(new Date().getFullYear(), 0, 1)),
+                baseCurrency: "SEK",
+                locale: "sv",
+                invoiceNumberPattern: "INV-{YYYY}-{SEQ:4}",
+                nextInvoiceSequence: 1,
+                invoiceSenderName: businessName,
+                accounts: {
+                  create: swedishSoleTraderDefaultAccounts.map((a) => ({
+                    code: a.code,
+                    name: a.name,
+                    type: a.type,
+                    vatCode: a.vatCode,
+                    isSystem: a.isSystem ?? false,
+                  })),
+                },
+                taxConfig: {
+                  create: {
+                    municipalTaxRate: 0.32,
+                    socialContributionRate: 0.2897,
+                    generalDeductionRate: 0.25,
+                    vatStandardRate: 0.25,
+                    vatReducedRateFood: 0.12,
+                    vatReducedRateCulture: 0.06,
+                  },
+                },
+              },
             },
           },
         },
-      });
-
-      await tx.membership.create({
-        data: { userId: newUser.id, businessId: newBusiness.id, role: "owner" },
-      });
-
-      return { user: newUser, business: newBusiness };
+      },
+      include: {
+        memberships: {
+          include: { business: true },
+          take: 1,
+        },
+      },
     });
 
-    user = result.user;
-    const token = await createSession(user.id, result.business.id);
+    const businessId = result.memberships[0]?.businessId;
+    if (!businessId) {
+      throw new Error("New BankID user was created without a business membership.");
+    }
+
+    user = result;
+    const token = await createSession(user.id, businessId);
     return {
       cookieName: AUTH_COOKIE_NAME,
       cookieValue: token,
       cookieMaxAge: AUTH_COOKIE_MAX_AGE_SECONDS,
       userId: user.id,
-      businessId: result.business.id,
+      businessId,
       isNewUser: true,
     };
   }

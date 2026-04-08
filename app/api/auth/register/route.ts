@@ -98,57 +98,63 @@ export async function POST(request: Request) {
   const verificationToken = randomBytes(32).toString("hex");
   const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
-  await prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({
+  try {
+    await prisma.user.create({
       data: {
         email: email.trim().toLowerCase(),
         passwordHash,
         fullName: fullName.trim(),
         emailVerificationToken: verificationToken,
         // tokenExpiry stored encoded in token suffix for simplicity — we rely on 24h window
-      }
-    });
-
-    const business = await tx.business.create({
-      data: {
-        name: businessName.trim(),
-        orgType: "sole_trader",
-        jurisdiction: Jurisdictions.SWEDEN,
-        bookkeepingMethod: "kontantmetoden",
-        vatRegistered: true,
-        vatFrequency: "yearly",
-        fiscalYearStart: new Date(Date.UTC(new Date().getFullYear(), 0, 1)),
-        baseCurrency: "SEK",
-        locale: "sv",
-        invoiceNumberPattern: "INV-{YYYY}-{SEQ:4}",
-        nextInvoiceSequence: 1,
-        invoiceSenderName: businessName.trim(),
-        accounts: {
-          create: swedishSoleTraderDefaultAccounts.map((a) => ({
-            code: a.code,
-            name: a.name,
-            type: a.type,
-            vatCode: a.vatCode,
-            isSystem: a.isSystem ?? false
-          }))
-        },
-        taxConfig: {
+        memberships: {
           create: {
-            municipalTaxRate: 0.32,
-            socialContributionRate: 0.2897,
-            generalDeductionRate: 0.25,
-            vatStandardRate: 0.25,
-            vatReducedRateFood: 0.12,
-            vatReducedRateCulture: 0.06
+            role: "owner",
+            business: {
+              create: {
+                name: businessName.trim(),
+                orgType: "sole_trader",
+                jurisdiction: Jurisdictions.SWEDEN,
+                bookkeepingMethod: "kontantmetoden",
+                vatRegistered: true,
+                vatFrequency: "yearly",
+                fiscalYearStart: new Date(Date.UTC(new Date().getFullYear(), 0, 1)),
+                baseCurrency: "SEK",
+                locale: "sv",
+                invoiceNumberPattern: "INV-{YYYY}-{SEQ:4}",
+                nextInvoiceSequence: 1,
+                invoiceSenderName: businessName.trim(),
+                accounts: {
+                  create: swedishSoleTraderDefaultAccounts.map((a) => ({
+                    code: a.code,
+                    name: a.name,
+                    type: a.type,
+                    vatCode: a.vatCode,
+                    isSystem: a.isSystem ?? false
+                  }))
+                },
+                taxConfig: {
+                  create: {
+                    municipalTaxRate: 0.32,
+                    socialContributionRate: 0.2897,
+                    generalDeductionRate: 0.25,
+                    vatStandardRate: 0.25,
+                    vatReducedRateFood: 0.12,
+                    vatReducedRateCulture: 0.06
+                  }
+                }
+              }
+            }
           }
         }
       }
     });
-
-    await tx.membership.create({
-      data: { userId: user.id, businessId: business.id, role: "owner" }
-    });
-  });
+  } catch (error) {
+    console.error("Registration provisioning failed:", error);
+    return NextResponse.json(
+      { error: "Registration is temporarily unavailable. Please try again shortly." },
+      { status: 500 }
+    );
+  }
 
   // Send confirmation email (non-blocking — failure doesn't prevent registration)
   try {
