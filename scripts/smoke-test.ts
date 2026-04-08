@@ -89,12 +89,14 @@ async function run() {
   // 2a. Register test account
   const testEmail = `smoke-${Date.now()}@test.akunta.local`;
   const testPassword = "SmokeTest!99";
-  let registered = false;
 
-  await check("POST /api/auth/register → 201", async () => {
-    const res = await fetch(`${BASE_URL}/api/auth/register`, {
+  await check("POST /api/register → 201", async () => {
+    const res = await fetch(`${BASE_URL}/api/register`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
       body: JSON.stringify({
         email: testEmail,
         password: testPassword,
@@ -102,27 +104,25 @@ async function run() {
         businessName: "Smoke Test AB"
       })
     });
-    const cookie = res.headers.get("set-cookie");
-    if (cookie) sessionCookie = cookie.split(";")[0];
-    registered = res.status === 201;
-    return { ok: registered, detail: `status=${res.status}` };
+    return { ok: res.status === 201, detail: `status=${res.status}` };
   });
 
-  if (!registered) {
-    // Try login with existing account if register failed (e.g. idempotent re-run)
-    await check("POST /api/auth/login → 200 (fallback)", async () => {
-      const res = await fetch(`${BASE_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: testEmail, password: testPassword })
-      });
-      const cookie = res.headers.get("set-cookie");
-      if (cookie) sessionCookie = cookie.split(";")[0];
-      return { ok: res.status === 200, detail: `status=${res.status}` };
+  // 2b. Login with the newly created account
+  await check("POST /api/auth/login → 200", async () => {
+    const res = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify({ email: testEmail, password: testPassword })
     });
-  }
+    const cookie = res.headers.get("set-cookie");
+    if (cookie) sessionCookie = cookie.split(";")[0];
+    return { ok: res.status === 200, detail: `status=${res.status}` };
+  });
 
-  // 2b. Me
+  // 2c. Me
   await check("GET /api/auth/me → 200 with session", async () => {
     const { status, body } = await json("/api/auth/me", { headers: withSession() });
     const ok = status === 200 && !!(body as Record<string, unknown>)?.userId;

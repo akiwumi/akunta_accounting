@@ -7,6 +7,7 @@ const AUTH_ROUTES = ["/login", "/register", "/sign-in"];
 
 // Public API routes — no session required
 const PUBLIC_API_ROUTES = [
+  "/api/register",
   "/api/auth/login",
   "/api/auth/logout",
   "/api/auth/register",
