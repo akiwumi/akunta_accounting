@@ -2785,48 +2785,91 @@ body.authRouteBody {
   display: grid;
   justify-items: center;
   text-align: center;
-  gap: 16px;
-  max-width: 520px;
+  gap: 18px;
+  max-width: 640px;
   width: 100%;
-  background: #fff;
-  border-radius: 18px;
-  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 251, 244, 0.98) 0%, #ffffff 100%);
+  border-radius: 28px;
+  border: 1px solid rgba(195, 199, 200, 0.28);
   padding: 48px 40px;
-  box-shadow: 0 4px 32px rgba(0,0,0,0.07);
+  box-shadow: 0 28px 60px rgba(54, 66, 68, 0.12);
 }
 
 .welcomeLogo {
-  width: 72px;
+  width: 82px;
   height: auto;
+}
+
+.welcomeEyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .welcomeTitle {
   margin: 0;
   font-family: var(--font-noto-serif), Georgia, serif;
   font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.2;
+}
+
+.welcomeTitle span {
+  display: block;
+  margin-top: 10px;
+  font-size: clamp(1.15rem, 2.2vw, 1.35rem);
+  color: var(--secondary);
+  font-family: var(--font-manrope), "Segoe UI", sans-serif;
+  font-weight: 700;
 }
 
 .welcomeBody {
   margin: 0;
   color: var(--muted);
   line-height: 1.6;
+  max-width: 54ch;
+}
+
+.welcomeLocaleBlock {
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(195, 199, 200, 0.28);
+  border-radius: 20px;
+  padding: 20px 22px;
+  box-shadow: 0 12px 30px rgba(54, 66, 68, 0.04);
+}
+
+.welcomeLocaleBlock h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.welcomeLocaleBlock p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
 }
 
 .welcomeChecklist {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   text-align: left;
-  background: var(--surface-alt, #f8f7f4);
-  border-radius: 10px;
-  padding: 16px 20px;
+  background: linear-gradient(180deg, #f8f5ef 0%, #f2eee7 100%);
+  border-radius: 18px;
+  padding: 18px 20px;
+  border: 1px solid rgba(195, 199, 200, 0.24);
 }
 
 .welcomeCheckItem {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   font-size: 0.93rem;
+  line-height: 1.55;
 }
 
 .welcomeCheckIcon {
@@ -2835,13 +2878,73 @@ body.authRouteBody {
   flex-shrink: 0;
 }
 
+.welcomeActions {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.welcomeStatus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.welcomeStatusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.welcomeStatus--confirmed {
+  color: #1c6a43;
+  background: rgba(28, 106, 67, 0.1);
+}
+
+.welcomeStatus--verifying {
+  color: #7a5e21;
+  background: rgba(144, 107, 34, 0.12);
+}
+
+.welcomeStatus--idle {
+  color: var(--primary);
+  background: rgba(54, 66, 68, 0.1);
+}
+
+.welcomeStatus--error {
+  color: var(--error);
+  background: rgba(186, 26, 26, 0.1);
+}
+
 .welcomeStartBtn {
   width: 100%;
   padding: 14px;
   font-size: 1rem;
 }
 
+.welcomeStartBtnMuted {
+  opacity: 0.95;
+}
+
 .welcomeNote {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.welcomeSupportNote {
   margin: 0;
   font-size: 0.85rem;
   color: var(--muted);

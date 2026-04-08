@@ -10,6 +10,7 @@ const PUBLIC_API_ROUTES = [
   "/api/register",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/auth/complete-supabase",
   "/api/auth/register",
   "/api/auth/verify",
   "/api/settings/locale",

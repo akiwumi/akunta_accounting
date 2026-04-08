@@ -5,6 +5,7 @@ import {
   AUTH_COOKIE_MAX_AGE_SECONDS,
   AUTH_COOKIE_NAME,
   createSession,
+  findUserByEmail,
   getUserBusinessId,
   verifyUserCredentials
 } from "@/lib/auth/session";
@@ -42,6 +43,14 @@ export async function POST(request: Request) {
   }
 
   try {
+    const existingUser = await findUserByEmail(email);
+    if (existingUser && !existingUser.emailVerifiedAt) {
+      return NextResponse.json(
+        { error: "Please confirm your email address before signing in." },
+        { status: 403 }
+      );
+    }
+
     const user = await verifyUserCredentials(email, password);
     if (!user) {
       return NextResponse.json({ error: "Invalid login credentials." }, { status: 401 });
