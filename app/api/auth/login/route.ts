@@ -21,14 +21,19 @@ export async function POST(request: Request) {
       }
     );
   }
-  let payload: { email?: unknown; password?: unknown } = {};
+  let payload: { email?: unknown; username?: unknown; password?: unknown } = {};
   try {
     payload = (await request.json()) as typeof payload;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const email = typeof payload.email === "string" ? payload.email.trim() : "";
+  const emailSource = typeof payload.email === "string"
+    ? payload.email
+    : typeof payload.username === "string"
+      ? payload.username
+      : "";
+  const email = emailSource.trim();
   const password = typeof payload.password === "string" ? payload.password : "";
 
   if (!email || !password) {
