@@ -25,11 +25,18 @@ export default function LoginPage() {
     setError(null);
     setIsSubmitting(true);
 
+    const formData = new FormData(e.currentTarget);
+    const submittedEmail = String(formData.get("email") ?? "").trim();
+    const submittedPassword = String(formData.get("password") ?? "");
+
+    setEmail(submittedEmail);
+    setPassword(submittedPassword);
+
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: submittedEmail, password: submittedPassword })
       });
       const payload = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
@@ -63,6 +70,7 @@ export default function LoginPage() {
           <label className="stack">
             Email
             <input
+              name="email"
               type="email"
               autoComplete="username"
               required
@@ -76,6 +84,7 @@ export default function LoginPage() {
             Password
             <div className="passwordInputWrapper">
               <input
+                name="password"
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 required

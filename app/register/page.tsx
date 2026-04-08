@@ -18,6 +18,17 @@ export default function RegisterPage() {
     setError(null);
     setIsSubmitting(true);
 
+    const formData = new FormData(e.currentTarget);
+    const submittedFullName = String(formData.get("fullName") ?? "").trim();
+    const submittedEmail = String(formData.get("email") ?? "").trim();
+    const submittedPassword = String(formData.get("password") ?? "");
+    const submittedBusinessName = String(formData.get("businessName") ?? "").trim();
+
+    setFullName(submittedFullName);
+    setEmail(submittedEmail);
+    setPassword(submittedPassword);
+    setBusinessName(submittedBusinessName);
+
     try {
       const res = await fetch("/api/register", {
         method: "POST",
@@ -25,7 +36,12 @@ export default function RegisterPage() {
           "content-type": "application/json",
           accept: "application/json"
         },
-        body: JSON.stringify({ fullName, email, password, businessName })
+        body: JSON.stringify({
+          fullName: submittedFullName,
+          email: submittedEmail,
+          password: submittedPassword,
+          businessName: submittedBusinessName
+        })
       });
       const payload = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
@@ -74,6 +90,7 @@ export default function RegisterPage() {
             <label className="stack">
               Full name
               <input
+                name="fullName"
                 required
                 autoComplete="name"
                 value={fullName}
@@ -85,6 +102,7 @@ export default function RegisterPage() {
             <label className="stack">
               Email
               <input
+                name="email"
                 type="email"
                 required
                 autoComplete="email"
@@ -97,6 +115,7 @@ export default function RegisterPage() {
             <label className="stack">
               Password
               <input
+                name="password"
                 type="password"
                 required
                 minLength={8}
@@ -110,6 +129,7 @@ export default function RegisterPage() {
             <label className="stack">
               Business name
               <input
+                name="businessName"
                 required
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
