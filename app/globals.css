@@ -443,6 +443,15 @@ a:hover {
   margin-top: -4px;
 }
 
+.dashboardSetupCard {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboardSetupActions {
+  margin-top: 4px;
+}
+
 .dashboardYearForm {
   align-items: flex-end;
 }
@@ -2678,13 +2687,6 @@ body.authRouteBody {
   width: clamp(160px, 20vw, 240px);
   height: auto;
   animation: logoEntrance 620ms ease-in-out both, logoBreath 2600ms ease-in-out 700ms infinite;
-}
-
-.landingSplashHint {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-  animation: routeFadeIn 800ms ease-in-out 1200ms both;
 }
 
 .landingFadeIn {

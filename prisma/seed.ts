@@ -27,7 +27,6 @@ async function main() {
       locale: "en",
       invoiceNumberPattern: "INV-{YYYY}-{SEQ:4}",
       nextInvoiceSequence: 1,
-      invoiceSenderName: "My Sole Trader Business",
       taxConfig: {
         create: {
           municipalTaxRate: 0.32,

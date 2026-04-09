@@ -13,3 +13,5 @@ eng.traineddata
 prisma/dev.db
 prisma/dev.db-journal
 uploads
+data/local-settings.json
+data/local-settings.local.json

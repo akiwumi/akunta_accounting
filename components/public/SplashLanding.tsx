@@ -68,7 +68,6 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
   const copy = sv
     ? {
         subtitle: "Bokföring & redovisning",
-        hint: "Bläddra ner för att utforska",
         heroTitle: "Bokföring för svenska egenföretagare — utan krångel.",
         heroSub: "Akunta hanterar kvitton, fakturor, bankimport, moms och löner på ett ställe. Svenska regler inbyggda.",
         startFree: "Kom igång gratis",
@@ -89,7 +88,6 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
       }
     : {
         subtitle: "Bookkeeping Accounting",
-        hint: "Scroll to explore",
         heroTitle: "Bookkeeping for Swedish sole traders — without the pain.",
         heroSub: "Akunta handles receipts, invoices, bank imports, VAT, and payroll in one place. Swedish rules built in. No accountant required for day-to-day books.",
         startFree: "Start free",
@@ -116,7 +114,6 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
           <Image src="/akunta_logo.png" alt="Akunta" width={610} height={614} className="landingSplashLogo" priority />
           <h1 className="splashTitle">Akunta</h1>
           <p className="splashSubtitle">{copy.subtitle}</p>
-          <p className="landingSplashHint">{copy.hint}</p>
         </div>
       </div>
     );

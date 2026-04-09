@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAuthContext } from "@/lib/auth/context";
-import { requireBusiness } from "@/lib/data/business";
 import { prisma } from "@/lib/db";
 import { Jurisdictions } from "@/lib/domain/enums";
 import {
@@ -45,6 +44,9 @@ const updateSchema = z.object({
 });
 
 export const dynamic = "force-dynamic";
+
+const toErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
 export async function GET() {
   const { businessId } = await requireAuthContext();
@@ -104,10 +106,15 @@ export async function PUT(request: Request) {
       generalDeductionRate: payload.generalDeductionRate
     };
 
-    // Always persist locally so settings survive even if DB write fails.
-    await writeLocalSettings(localPayload);
-
     const { businessId } = await requireAuthContext();
+    let localSaveError: string | null = null;
+
+    try {
+      // Persist a local fallback when possible, but do not let a read-only filesystem block the primary save.
+      await writeLocalSettings(localPayload);
+    } catch (error) {
+      localSaveError = toErrorMessage(error, "Failed to save the local settings fallback.");
+    }
 
     try {
       const updated = await prisma.business.update({
@@ -157,9 +164,22 @@ export async function PUT(request: Request) {
 
       return NextResponse.json({
         ...updated,
-        savedLocally: true
+        savedLocally: localSaveError === null,
+        warning: localSaveError ? `Saved to the database only: ${localSaveError}` : undefined
       });
     } catch (dbError) {
+      if (localSaveError) {
+        return NextResponse.json(
+          {
+            error: `Failed to save settings. Database error: ${toErrorMessage(
+              dbError,
+              "Unknown database error."
+            )}. Local fallback error: ${localSaveError}`
+          },
+          { status: 500 }
+        );
+      }
+
       const fallback = await prisma.business.findUnique({ where: { id: businessId }, include: { taxConfig: true } });
       const merged = mergeBusinessWithLocalSettings(fallback ?? { id: businessId } as never, localPayload);
       return NextResponse.json({
@@ -174,7 +194,7 @@ export async function PUT(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Failed to save settings."
+        error: toErrorMessage(error, "Failed to save settings.")
       },
       { status: 500 }
     );

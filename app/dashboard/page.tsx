@@ -1,5 +1,7 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
+
 import { buildDashboardSummary } from "@/lib/accounting/reports";
 import { SectionExportBar } from "@/components/layout/SectionExportBar";
 import { fiscalYearPeriod, formatTaxYearLabel, getFiscalYearStartMonth, parseTaxYear } from "@/lib/data/period";
@@ -21,6 +23,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     locale === "sv"
       ? {
           title: "Bokföringsöversikt",
+          setupTitle: "Ange ditt skatteår innan du börjar",
+          setupBody:
+            "För att komma igång behöver du öppna Inställningar och välja vilken månad ditt skatteår börjar. Akunta använder det för dashboarden och dina rapportperioder.",
+          setupCta: "Öppna inställningar",
           annual: "Årsbokslut (historik)",
           taxYear: "Skatteår",
           customNote: "Stängda skatteår följer din valda skatteårsperiod i inställningarna.",
@@ -42,6 +48,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         }
       : {
           title: "Accounting Dashboard",
+          setupTitle: "Set your tax year before you start",
+          setupBody:
+            "To get started, open Settings and choose which month your tax year begins. Akunta uses that for your dashboard and reporting periods.",
+          setupCta: "Open settings",
           annual: "Annual Books (Historical)",
           taxYear: "Tax Year",
           customNote: "Closed tax years follow your configured tax-year range in settings.",
@@ -105,6 +115,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       }
     })
   ]);
+  const needsInitialTaxYearSetup =
+    transactionCount === 0 &&
+    receiptCount === 0 &&
+    Math.abs(business.updatedAt.getTime() - business.createdAt.getTime()) < 60_000;
 
   return (
     <section className="page dashboardPage">
@@ -113,6 +127,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         {business.name} · {business.jurisdiction} · {business.bookkeepingMethod} · VAT {business.vatFrequency} ·{" "}
         {copy.taxYear} {taxYearLabel}
       </p>
+      {needsInitialTaxYearSetup ? (
+        <article className="card dashboardSetupCard">
+          <h2>{copy.setupTitle}</h2>
+          <p className="note">{copy.setupBody}</p>
+          <div className="row dashboardSetupActions">
+            <Link className="button" href="/settings#business-settings">
+              {copy.setupCta}
+            </Link>
+          </div>
+        </article>
+      ) : null}
       <SectionExportBar locale={locale} section="dashboard" params={{ year: String(selectedYear) }} />
       <div className="row dashboardExportRow" id="dashboard-export-accounts">
         <a className="button" href={`/api/exports/accounts?year=${selectedYear}`}>

@@ -69,7 +69,6 @@ export async function resolveOrProvisionBankIdUser(
                 locale: "sv",
                 invoiceNumberPattern: "INV-{YYYY}-{SEQ:4}",
                 nextInvoiceSequence: 1,
-                invoiceSenderName: businessName,
                 accounts: {
                   create: swedishSoleTraderDefaultAccounts.map((a) => ({
                     code: a.code,

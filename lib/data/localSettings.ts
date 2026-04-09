@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 export type LocalBusinessSettings = {
@@ -29,7 +30,29 @@ export type LocalBusinessSettings = {
   generalDeductionRate?: number;
 };
 
-const LOCAL_SETTINGS_PATH = path.join(process.cwd(), "data", "local-settings.json");
+const LEGACY_LOCAL_SETTINGS_PATH = path.join(process.cwd(), "data", "local-settings.json");
+const PROJECT_LOCAL_SETTINGS_PATH = path.join(process.cwd(), "data", "local-settings.local.json");
+const TEMP_LOCAL_SETTINGS_PATH = path.join(os.tmpdir(), "akunta", "local-settings.json");
+const CUSTOM_LOCAL_SETTINGS_PATH = process.env.LOCAL_SETTINGS_PATH?.trim();
+
+const LOCAL_SETTINGS_WRITE_PATHS = Array.from(
+  new Set(
+    [CUSTOM_LOCAL_SETTINGS_PATH, PROJECT_LOCAL_SETTINGS_PATH, TEMP_LOCAL_SETTINGS_PATH].filter(
+      (value): value is string => Boolean(value)
+    )
+  )
+);
+
+const LOCAL_SETTINGS_READ_PATHS = Array.from(
+  new Set(
+    [
+      CUSTOM_LOCAL_SETTINGS_PATH,
+      PROJECT_LOCAL_SETTINGS_PATH,
+      TEMP_LOCAL_SETTINGS_PATH,
+      LEGACY_LOCAL_SETTINGS_PATH
+    ].filter((value): value is string => Boolean(value))
+  )
+);
 
 type LocalSettingsFile = {
   updatedAt: string;
@@ -44,11 +67,17 @@ const toNumber = (value: unknown, fallback: number) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const toTimestamp = (value: string | undefined) => {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const normalizeSettings = (value: unknown): LocalBusinessSettings | null => {
   if (!isObject(value)) return null;
 
   return {
-    name: typeof value.name === "string" ? value.name : "My Sole Trader Business",
+    name: typeof value.name === "string" ? value.name : "",
     jurisdiction: typeof value.jurisdiction === "string" ? value.jurisdiction : "SWEDEN",
     locale: typeof value.locale === "string" ? value.locale : "en",
     baseCurrency: typeof value.baseCurrency === "string" ? value.baseCurrency : "SEK",
@@ -83,21 +112,61 @@ export const writeLocalSettings = async (settings: LocalBusinessSettings) => {
     settings
   };
 
-  await fs.mkdir(path.dirname(LOCAL_SETTINGS_PATH), { recursive: true });
-  await fs.writeFile(LOCAL_SETTINGS_PATH, JSON.stringify(payload, null, 2), "utf8");
+  const serialized = JSON.stringify(payload, null, 2);
+  const failures: string[] = [];
+
+  for (const localSettingsPath of LOCAL_SETTINGS_WRITE_PATHS) {
+    try {
+      await fs.mkdir(path.dirname(localSettingsPath), { recursive: true });
+      await fs.writeFile(localSettingsPath, serialized, "utf8");
+      return;
+    } catch (error) {
+      failures.push(
+        `${localSettingsPath}: ${error instanceof Error ? error.message : "Unknown write failure"}`
+      );
+    }
+  }
+
+  throw new Error(`Failed to write local settings. ${failures.join(" | ")}`);
 };
 
 export const readLocalSettings = async (): Promise<LocalBusinessSettings | null> => {
-  try {
-    const raw = await fs.readFile(LOCAL_SETTINGS_PATH, "utf8");
-    const parsed: unknown = JSON.parse(raw);
-    if (isObject(parsed) && "settings" in parsed) {
-      return normalizeSettings(parsed.settings);
+  let newestMatch: { settings: LocalBusinessSettings; updatedAt: number } | null = null;
+
+  for (const localSettingsPath of LOCAL_SETTINGS_READ_PATHS) {
+    try {
+      const raw = await fs.readFile(localSettingsPath, "utf8");
+      const parsed: unknown = JSON.parse(raw);
+
+      if (isObject(parsed) && "settings" in parsed) {
+        const settings = normalizeSettings(parsed.settings);
+        if (!settings) continue;
+
+        const candidate = {
+          settings,
+          updatedAt: toTimestamp(typeof parsed.updatedAt === "string" ? parsed.updatedAt : undefined)
+        };
+
+        if (!newestMatch || candidate.updatedAt >= newestMatch.updatedAt) {
+          newestMatch = candidate;
+        }
+
+        continue;
+      }
+
+      const settings = normalizeSettings(parsed);
+      if (!settings) continue;
+
+      const candidate = { settings, updatedAt: 0 };
+      if (!newestMatch || candidate.updatedAt >= newestMatch.updatedAt) {
+        newestMatch = candidate;
+      }
+    } catch {
+      continue;
     }
-    return normalizeSettings(parsed);
-  } catch {
-    return null;
   }
+
+  return newestMatch?.settings ?? null;
 };
 
 export const mergeBusinessWithLocalSettings = <T extends { [key: string]: unknown }>(
@@ -108,7 +177,7 @@ export const mergeBusinessWithLocalSettings = <T extends { [key: string]: unknow
 
   const merged = {
     ...business,
-    name: local.name,
+    name: local.name || String((business as { name?: unknown }).name ?? ""),
     jurisdiction: local.jurisdiction,
     locale: local.locale,
     baseCurrency: local.baseCurrency,
