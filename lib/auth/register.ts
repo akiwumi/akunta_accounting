@@ -7,7 +7,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { swedishSoleTraderDefaultAccounts } from "@/lib/accounting/chartOfAccounts";
-import { isResendConfigured, sendEmailViaResend } from "@/lib/email/resend";
 import { createSmtpTransport, getDefaultEmailFromAddress, getSmtpConfig } from "@/lib/email/smtp";
 import { prisma } from "@/lib/db";
 import { Jurisdictions } from "@/lib/domain/enums";
@@ -117,42 +116,15 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
     "If you didn't create this account, you can ignore this email."
   ].join("\n");
 
-  // ── Resend (preferred — works on Vercel) ──────────────────────────────────
-  if (isResendConfigured()) {
-    const from = process.env.EMAIL_FROM?.trim() ?? "Akunta <noreply@akunta.se>";
-    try {
-      await sendEmailViaResend({
-        from,
-        to: email,
-        subject: "Bekräfta ditt Akunta-konto | Confirm your Akunta account",
-        html,
-        text
-      });
-    } catch (error) {
-      logger.error("auth.verification_email.resend_failed", {
-        email,
-        appUrl,
-        confirmationUrl,
-        emailFrom: from,
-        ...getMailErrorDetails(error)
-      });
-      throw error;
-    }
-
-    logger.info("auth.verification_email.sent", { email, appUrl, provider: "resend" });
-    return;
-  }
-
-  // ── SMTP fallback (local dev / self-hosted) ───────────────────────────────
   const smtp = getSmtpConfig();
   if (!smtp.ok) {
     if (process.env.NODE_ENV === "production") {
-      logger.error("auth.verification_email.not_configured", {
+      logger.error("auth.verification_email.smtp_not_configured", {
         email,
         appUrl,
         missing: smtp.missing
       });
-      throw new Error("Email delivery is not configured. Set RESEND_API_KEY or SMTP credentials.");
+      throw new Error(smtp.error);
     }
 
     console.info(`[DEV] Email verification link for ${email}: ${confirmationUrl}`);

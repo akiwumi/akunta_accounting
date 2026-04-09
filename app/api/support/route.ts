@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { isResendConfigured, sendEmailViaResend } from "@/lib/email/resend";
 import { createSmtpTransport, getDefaultEmailFromAddress, getSmtpConfig } from "@/lib/email/smtp";
 import { getClientIp, rateLimit } from "@/lib/security/rateLimit";
 import { logger } from "@/lib/observability/logger";
@@ -48,35 +47,18 @@ export async function POST(request: Request) {
     messageLength: message.length
   });
 
-  // Forward to support inbox if configured (non-fatal if it fails)
-  const supportEmail = process.env.SUPPORT_EMAIL;
-  if (supportEmail) {
+  // Forward to support inbox if SMTP + SUPPORT_EMAIL are configured (non-fatal if it fails)
+  const smtp = getSmtpConfig();
+  if (smtp.ok && process.env.SUPPORT_EMAIL) {
     try {
-      const emailText = `Name: ${name}\nEmail: ${email}\n\n${message}`;
-
-      if (isResendConfigured()) {
-        const from = process.env.EMAIL_FROM?.trim() ?? "Akunta <noreply@akunta.se>";
-        await sendEmailViaResend({
-          from,
-          to: supportEmail,
-          subject: `[Support] ${subject}`,
-          html: `<p><strong>Name:</strong> ${name}<br/><strong>Email:</strong> ${email}</p><p>${message.replace(/\n/g, "<br/>")}</p>`,
-          text: emailText
-        });
-      } else {
-        const smtp = getSmtpConfig();
-        if (smtp.ok) {
-          const transporter = createSmtpTransport(smtp.config);
-          await transporter.sendMail({
-            from: getDefaultEmailFromAddress(`Akunta Support Form <${smtp.config.user}>`),
-            replyTo: `"${name}" <${email}>`,
-            to: supportEmail,
-            subject: `[Support] ${subject}`,
-            text: emailText
-          });
-        }
-      }
-
+      const transporter = createSmtpTransport(smtp.config);
+      await transporter.sendMail({
+        from: getDefaultEmailFromAddress(`Akunta Support Form <${smtp.config.user}>`),
+        replyTo: `"${name}" <${email}>`,
+        to: process.env.SUPPORT_EMAIL,
+        subject: `[Support] ${subject}`,
+        text: `Name: ${name}\nEmail: ${email}\n\n${message}`
+      });
       logger.info("support.request.emailed", { email });
     } catch (err) {
       logger.error("support.request.email_failed", {
