@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
+import { isResendConfigured, sendEmailViaResend } from "@/lib/email/resend";
 import { createSmtpTransport, getDefaultEmailFromAddress, getSmtpConfig } from "@/lib/email/smtp";
 import { loadInvoiceForOutput } from "@/lib/invoices/load";
 import { buildInvoicePdf } from "@/lib/invoices/pdf";
@@ -53,16 +54,6 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const payload = sendInvoiceEmailSchema.parse(await request.json().catch(() => ({})));
-
-  const smtp = getSmtpConfig();
-  if (!smtp.ok) {
-    return NextResponse.json(
-      {
-        error: `${smtp.error} Set SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS to enable invoice email.`
-      },
-      { status: 400 }
-    );
-  }
 
   const { businessId } = await requireAuthContext();
   const invoice = await loadInvoiceForOutput({
@@ -115,30 +106,40 @@ export async function POST(request: Request, context: RouteContext) {
     currency: invoice.currency
   }).format(invoice.grossAmount);
 
-  const transporter = createSmtpTransport(smtp.config);
-
-  const fromAddress =
-    getDefaultEmailFromAddress(invoice.businessInvoiceEmailFrom?.trim());
+  const fromAddress = getDefaultEmailFromAddress(invoice.businessInvoiceEmailFrom?.trim());
   const subject = payload.subject?.trim() || `Invoice ${invoice.invoiceNumber}`;
   const filename = `invoice-${sanitizeFileNamePart(invoice.invoiceNumber)}.pdf`;
-
-  await transporter.sendMail({
-    from: fromAddress,
-    to: payload.to,
-    subject,
-    html: buildHtml({
-      message: payload.message,
-      invoiceNumber: invoice.invoiceNumber,
-      amount: formattedAmount
-    }),
-    attachments: [
-      {
-        filename,
-        content: pdfBuffer,
-        contentType: "application/pdf"
-      }
-    ]
+  const html = buildHtml({
+    message: payload.message,
+    invoiceNumber: invoice.invoiceNumber,
+    amount: formattedAmount
   });
+
+  if (isResendConfigured()) {
+    await sendEmailViaResend({
+      from: fromAddress,
+      to: payload.to,
+      subject,
+      html,
+      attachments: [{ filename, content: pdfBuffer, contentType: "application/pdf" }]
+    });
+  } else {
+    const smtp = getSmtpConfig();
+    if (!smtp.ok) {
+      return NextResponse.json(
+        { error: "Email delivery is not configured. Set RESEND_API_KEY or SMTP credentials." },
+        { status: 503 }
+      );
+    }
+    const transporter = createSmtpTransport(smtp.config);
+    await transporter.sendMail({
+      from: fromAddress,
+      to: payload.to,
+      subject,
+      html,
+      attachments: [{ filename, content: pdfBuffer, contentType: "application/pdf" }]
+    });
+  }
 
   await prisma.invoice.update({
     where: { id: invoice.id },

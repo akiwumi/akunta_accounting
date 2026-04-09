@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { swedishSoleTraderDefaultAccounts } from "@/lib/accounting/chartOfAccounts";
+import { isResendConfigured, sendEmailViaResend } from "@/lib/email/resend";
 import { createSmtpTransport, getDefaultEmailFromAddress, getSmtpConfig } from "@/lib/email/smtp";
 import { prisma } from "@/lib/db";
 import { Jurisdictions } from "@/lib/domain/enums";
@@ -53,17 +54,105 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const confirmationUrl = `${appUrl}/api/auth/verify?token=${encodeURIComponent(token)}`;
   const logoUrl = `${appUrl}/akunta_logo.png`;
-  const logoCid = "akunta-confirmation-logo";
 
+  const firstName = fullName.split(" ")[0] ?? fullName;
+  const safeFirstName = escapeHtml(firstName);
+  const safeConfirmationUrl = escapeHtml(confirmationUrl);
+  const logoSrc = escapeHtml(logoUrl);
+
+  const html = `
+    <div style="margin:0;background:#f5f2eb;padding:32px 16px;font-family:Arial,sans-serif;color:#203033">
+      <div style="max-width:600px;margin:0 auto;background:#fffaf4;border:1px solid #e7dfd2;border-radius:24px;padding:36px 32px;box-shadow:0 18px 48px rgba(54,66,68,0.08)">
+        <img src="${logoSrc}" alt="Akunta" width="56" height="56"
+          style="display:block;margin:0 0 20px;border-radius:14px" />
+        <p style="margin:0 0 8px;color:#6b7a7d;font-size:13px;letter-spacing:0.08em;text-transform:uppercase">
+          Akunta
+        </p>
+        <h1 style="margin:0 0 14px;font-size:30px;line-height:1.15;color:#243336">
+          Hej ${safeFirstName}, varmt välkommen till Akunta.
+        </h1>
+        <p style="margin:0 0 20px;font-size:16px;line-height:1.7;color:#47585b">
+          Bekräfta din e-postadress för att öppna din välkomstsida och komma vidare till din dashboard.
+          Akunta hjälper dig att hålla ordning på bokföring, moms, kvitton och fakturor, så att du kan fokusera på ditt företag.
+        </p>
+        <p style="margin:0 0 28px;font-size:16px;line-height:1.7;color:#47585b">
+          Hi ${safeFirstName}, welcome to Akunta.
+          Confirm your email address to open your welcome page and continue to your dashboard.
+          Akunta helps you stay on top of bookkeeping, VAT, receipts, and invoices so you can focus on running your business.
+        </p>
+        <a href="${safeConfirmationUrl}"
+          style="display:inline-block;padding:14px 24px;background:#364244;color:#fffaf4;text-decoration:none;border-radius:999px;font-weight:700;font-size:15px">
+          Öppna välkomstsidan / Open welcome page
+        </a>
+        <div style="margin:28px 0 0;padding:18px 20px;background:#f3efe6;border-radius:18px;color:#5b686b;font-size:14px;line-height:1.7">
+          <strong style="color:#243336">Direktlänk / Direct link</strong><br />
+          <a href="${safeConfirmationUrl}" style="color:#364244;word-break:break-all">${safeConfirmationUrl}</a>
+        </div>
+        <p style="margin:24px 0 0;font-size:13px;line-height:1.7;color:#718083">
+          Om du inte skapade kontot kan du ignorera det här mejlet.<br />
+          If you didn&apos;t create this account, you can ignore this email.
+        </p>
+      </div>
+    </div>
+  `;
+
+  const text = [
+    `Hej ${firstName},`,
+    "",
+    "Tack för att du har skapat ett konto i Akunta.",
+    "Öppna länken nedan för att bekräfta din e-postadress och komma till din välkomstsida:",
+    confirmationUrl,
+    "",
+    "Akunta hjälper dig att hålla ordning på bokföring, moms, kvitton och fakturor så att du kan fokusera på din verksamhet.",
+    "",
+    `Hi ${firstName},`,
+    "",
+    "Thanks for creating your Akunta account.",
+    "Open the link below to confirm your email address and continue to your welcome page:",
+    confirmationUrl,
+    "",
+    "Akunta helps you stay on top of bookkeeping, VAT, receipts, and invoices so you can focus on your business.",
+    "",
+    "Om du inte skapade kontot kan du ignorera det här mejlet.",
+    "If you didn't create this account, you can ignore this email."
+  ].join("\n");
+
+  // ── Resend (preferred — works on Vercel) ──────────────────────────────────
+  if (isResendConfigured()) {
+    const from = process.env.EMAIL_FROM?.trim() ?? "Akunta <noreply@akunta.se>";
+    try {
+      await sendEmailViaResend({
+        from,
+        to: email,
+        subject: "Bekräfta ditt Akunta-konto | Confirm your Akunta account",
+        html,
+        text
+      });
+    } catch (error) {
+      logger.error("auth.verification_email.resend_failed", {
+        email,
+        appUrl,
+        confirmationUrl,
+        emailFrom: from,
+        ...getMailErrorDetails(error)
+      });
+      throw error;
+    }
+
+    logger.info("auth.verification_email.sent", { email, appUrl, provider: "resend" });
+    return;
+  }
+
+  // ── SMTP fallback (local dev / self-hosted) ───────────────────────────────
   const smtp = getSmtpConfig();
   if (!smtp.ok) {
     if (process.env.NODE_ENV === "production") {
-      logger.error("auth.verification_email.smtp_not_configured", {
+      logger.error("auth.verification_email.not_configured", {
         email,
         appUrl,
         missing: smtp.missing
       });
-      throw new Error(smtp.error);
+      throw new Error("Email delivery is not configured. Set RESEND_API_KEY or SMTP credentials.");
     }
 
     console.info(`[DEV] Email verification link for ${email}: ${confirmationUrl}`);
@@ -71,27 +160,20 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
   }
 
   const transporter = createSmtpTransport(smtp.config);
+  const from = getDefaultEmailFromAddress();
 
-  const firstName = fullName.split(" ")[0] ?? fullName;
-  const safeFirstName = escapeHtml(firstName);
-  const safeConfirmationUrl = escapeHtml(confirmationUrl);
-  let logoSrc = escapeHtml(logoUrl);
+  // Attempt to attach logo inline; non-fatal if it fails
+  let logoSrcFinal = logoSrc;
   let attachments: { filename: string; content: Buffer; cid: string }[] | undefined;
-
   try {
     const logoBuffer = await readFile(path.join(process.cwd(), "public", "akunta_logo.png"));
-    attachments = [{ filename: "akunta_logo.png", content: logoBuffer, cid: logoCid }];
-    logoSrc = `cid:${logoCid}`;
-  } catch (error) {
+    attachments = [{ filename: "akunta_logo.png", content: logoBuffer, cid: "akunta-confirmation-logo" }];
+    logoSrcFinal = "cid:akunta-confirmation-logo";
+  } catch {
     attachments = undefined;
-    logger.warn("auth.verification_email.logo_attachment_failed", {
-      email,
-      logoPath: path.join(process.cwd(), "public", "akunta_logo.png"),
-      ...getMailErrorDetails(error)
-    });
   }
 
-  const from = getDefaultEmailFromAddress();
+  const htmlWithLogo = html.replace(escapeHtml(logoUrl), logoSrcFinal);
 
   try {
     await transporter.sendMail({
@@ -99,74 +181,17 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
       to: email,
       subject: "Bekräfta ditt Akunta-konto | Confirm your Akunta account",
       attachments,
-      text: [
-        `Hej ${firstName},`,
-        "",
-        "Tack för att du har skapat ett konto i Akunta.",
-        "Öppna länken nedan för att bekräfta din e-postadress och komma till din välkomstsida:",
-        confirmationUrl,
-        "",
-        "Akunta hjälper dig att hålla ordning på bokföring, moms, kvitton och fakturor så att du kan fokusera på din verksamhet.",
-        "",
-        `Hi ${firstName},`,
-        "",
-        "Thanks for creating your Akunta account.",
-        "Open the link below to confirm your email address and continue to your welcome page:",
-        confirmationUrl,
-        "",
-        "Akunta helps you stay on top of bookkeeping, VAT, receipts, and invoices so you can focus on your business.",
-        "",
-        "Om du inte skapade kontot kan du ignorera det här mejlet.",
-        "If you didn't create this account, you can ignore this email."
-      ].join("\n"),
-      html: `
-        <div style="margin:0;background:#f5f2eb;padding:32px 16px;font-family:Arial,sans-serif;color:#203033">
-          <div style="max-width:600px;margin:0 auto;background:#fffaf4;border:1px solid #e7dfd2;border-radius:24px;padding:36px 32px;box-shadow:0 18px 48px rgba(54,66,68,0.08)">
-            <img src="${logoSrc}" alt="Akunta" width="56" height="56"
-              style="display:block;margin:0 0 20px;border-radius:14px" />
-            <p style="margin:0 0 8px;color:#6b7a7d;font-size:13px;letter-spacing:0.08em;text-transform:uppercase">
-              Akunta
-            </p>
-            <h1 style="margin:0 0 14px;font-size:30px;line-height:1.15;color:#243336">
-              Hej ${safeFirstName}, varmt välkommen till Akunta.
-            </h1>
-            <p style="margin:0 0 20px;font-size:16px;line-height:1.7;color:#47585b">
-              Bekräfta din e-postadress för att öppna din välkomstsida och komma vidare till din dashboard.
-              Akunta hjälper dig att hålla ordning på bokföring, moms, kvitton och fakturor, så att du kan fokusera på ditt företag.
-            </p>
-            <p style="margin:0 0 28px;font-size:16px;line-height:1.7;color:#47585b">
-              Hi ${safeFirstName}, welcome to Akunta.
-              Confirm your email address to open your welcome page and continue to your dashboard.
-              Akunta helps you stay on top of bookkeeping, VAT, receipts, and invoices so you can focus on running your business.
-            </p>
-            <a href="${safeConfirmationUrl}"
-              style="display:inline-block;padding:14px 24px;background:#364244;color:#fffaf4;text-decoration:none;border-radius:999px;font-weight:700;font-size:15px">
-              Öppna välkomstsidan / Open welcome page
-            </a>
-            <div style="margin:28px 0 0;padding:18px 20px;background:#f3efe6;border-radius:18px;color:#5b686b;font-size:14px;line-height:1.7">
-              <strong style="color:#243336">Direktlänk / Direct link</strong><br />
-              <a href="${safeConfirmationUrl}" style="color:#364244;word-break:break-all">${safeConfirmationUrl}</a>
-            </div>
-            <p style="margin:24px 0 0;font-size:13px;line-height:1.7;color:#718083">
-              Om du inte skapade kontot kan du ignorera det här mejlet.<br />
-              If you didn&apos;t create this account, you can ignore this email.
-            </p>
-          </div>
-        </div>
-      `
+      text,
+      html: htmlWithLogo
     });
   } catch (error) {
-    logger.error("auth.verification_email.send_failed", {
+    logger.error("auth.verification_email.smtp_failed", {
       email,
       appUrl,
       confirmationUrl,
       emailFrom: from,
       smtpHost: smtp.config.host,
       smtpPort: smtp.config.port,
-      smtpSecure: smtp.config.secure,
-      smtpRequireTLS: smtp.config.requireTLS,
-      smtpUser: smtp.config.user,
-      hasInlineLogo: Boolean(attachments),
       ...getMailErrorDetails(error)
     });
     throw error;
@@ -175,14 +200,8 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
   logger.info("auth.verification_email.sent", {
     email,
     appUrl,
-    confirmationUrl,
-    emailFrom: from,
-    smtpHost: smtp.config.host,
-    smtpPort: smtp.config.port,
-    smtpSecure: smtp.config.secure,
-    smtpRequireTLS: smtp.config.requireTLS,
-    smtpUser: smtp.config.user,
-    hasInlineLogo: Boolean(attachments)
+    provider: "smtp",
+    smtpHost: smtp.config.host
   });
 }
 

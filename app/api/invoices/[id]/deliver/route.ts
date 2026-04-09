@@ -20,6 +20,7 @@ import { z } from "zod";
 
 import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
+import { isResendConfigured, sendEmailViaResend } from "@/lib/email/resend";
 import { createSmtpTransport, getDefaultEmailFromAddress, getSmtpConfig } from "@/lib/email/smtp";
 import { loadInvoiceForOutput } from "@/lib/invoices/load";
 import { buildInvoicePdf } from "@/lib/invoices/pdf";
@@ -129,23 +130,33 @@ export async function POST(request: Request, { params }: RouteContext) {
       ? `<p>${data.message.replace(/\n/g, "<br>")}</p>`
       : `<p>Please find your invoice ${invoice.invoiceNumber} attached.</p>`;
 
-    const smtp = getSmtpConfig();
-    if (!smtp.ok) {
-      return NextResponse.json(
-        { error: smtp.error },
-        { status: 503 }
-      );
+    const from = getDefaultEmailFromAddress(business.invoiceEmailFrom ?? undefined);
+
+    if (isResendConfigured()) {
+      await sendEmailViaResend({
+        from,
+        to: data.to,
+        subject,
+        html,
+        attachments: [{ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" }]
+      });
+    } else {
+      const smtp = getSmtpConfig();
+      if (!smtp.ok) {
+        return NextResponse.json(
+          { error: "Email delivery is not configured. Set RESEND_API_KEY or SMTP credentials." },
+          { status: 503 }
+        );
+      }
+      const transporter = createSmtpTransport(smtp.config);
+      await transporter.sendMail({
+        from,
+        to: data.to,
+        subject,
+        html,
+        attachments: [{ filename: pdfFilename, content: pdfBuffer }]
+      });
     }
-
-    const transporter = createSmtpTransport(smtp.config);
-
-    await transporter.sendMail({
-      from: getDefaultEmailFromAddress(business.invoiceEmailFrom ?? undefined),
-      to: data.to,
-      subject,
-      html,
-      attachments: [{ filename: pdfFilename, content: pdfBuffer }],
-    });
 
     await prisma.invoice.update({
       where: { id },

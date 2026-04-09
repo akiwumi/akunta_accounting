@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -28,6 +29,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing transaction id." }, { status: 400 });
   }
 
+  const { businessId } = await requireAuthContext();
   const payload = patchSchema.parse(await request.json());
   const parsedDate = payload.txnDate ? new Date(`${payload.txnDate}T00:00:00.000Z`) : undefined;
   if (parsedDate && Number.isNaN(parsedDate.valueOf())) {
@@ -35,7 +37,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const existing = await prisma.transaction.findUnique({
-    where: { id: transactionId },
+    where: { id: transactionId, businessId },
     select: { id: true, paidInvoiceId: true }
   });
   if (!existing) {
@@ -77,8 +79,10 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing transaction id." }, { status: 400 });
   }
 
+  const { businessId } = await requireAuthContext();
+
   const existing = await prisma.transaction.findUnique({
-    where: { id: transactionId },
+    where: { id: transactionId, businessId },
     select: { id: true, paidInvoiceId: true }
   });
   if (!existing) {

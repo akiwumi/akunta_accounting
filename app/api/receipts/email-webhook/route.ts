@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -35,11 +35,15 @@ const round4 = (value: number) => Math.round(value * 10000) / 10000;
 
 export async function POST(request: Request) {
   const expectedSecret = process.env.EMAIL_WEBHOOK_SECRET;
-  if (expectedSecret) {
-    const received = request.headers.get("x-email-webhook-secret");
-    if (received !== expectedSecret) {
-      return NextResponse.json({ error: "Unauthorized webhook request." }, { status: 401 });
-    }
+  if (!expectedSecret) {
+    return NextResponse.json({ error: "Webhook secret is not configured." }, { status: 503 });
+  }
+  const received = request.headers.get("x-email-webhook-secret") ?? "";
+  const expectedBuf = Buffer.from(expectedSecret);
+  const receivedBuf = Buffer.alloc(expectedBuf.length);
+  receivedBuf.write(received);
+  if (!timingSafeEqual(expectedBuf, receivedBuf) || received !== expectedSecret) {
+    return NextResponse.json({ error: "Unauthorized webhook request." }, { status: 401 });
   }
 
   const payload = (await request.json()) as InboundPayload;

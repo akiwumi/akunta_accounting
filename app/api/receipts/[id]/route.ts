@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { asNumber, round2 } from "@/lib/accounting/math";
+import { requireAuthContext } from "@/lib/auth/context";
 import { supportsReceiptItemPurchasedField } from "@/lib/data/receiptItemSupport";
 import { prisma } from "@/lib/db";
 import { EntrySources, TransactionDirections, type TransactionDirection } from "@/lib/domain/enums";
@@ -108,11 +109,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing receipt id." }, { status: 400 });
   }
 
+  const { businessId } = await requireAuthContext();
   const rawPayload = patchSchema.parse(await request.json());
   const canUseItemPurchased = await supportsReceiptItemPurchasedField();
 
   const existing = await prisma.receipt.findUnique({
-    where: { id: receiptId },
+    where: { id: receiptId, businessId },
     include: {
       transactions: {
         select: {
@@ -532,8 +534,10 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing receipt id." }, { status: 400 });
   }
 
+  const { businessId } = await requireAuthContext();
+
   const existing = await prisma.receipt.findUnique({
-    where: { id: receiptId },
+    where: { id: receiptId, businessId },
     select: { id: true }
   });
   if (!existing) {

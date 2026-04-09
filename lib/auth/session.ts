@@ -33,7 +33,8 @@ export const verifyPassword = async (password: string, hash: string): Promise<bo
 export const generateSessionToken = () => randomBytes(32).toString("hex");
 
 export const hashToken = async (token: string): Promise<string> => {
-  const key = (await scryptAsync(token, "akunta-session-salt", 32)) as Buffer;
+  const salt = process.env.SESSION_SALT?.trim() || "akunta-session-salt";
+  const key = (await scryptAsync(token, salt, 32)) as Buffer;
   return key.toString("hex");
 };
 

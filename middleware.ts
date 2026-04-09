@@ -25,7 +25,13 @@ function isAuthRoute(pathname: string): boolean {
   return AUTH_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
 }
 
+// Sensitive sub-routes that must remain protected even if their parent is public
+const PROTECTED_API_SUBROUTES = ["/api/health/smtp"];
+
 function isPublicApiRoute(pathname: string): boolean {
+  if (PROTECTED_API_SUBROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
+    return false;
+  }
   return PUBLIC_API_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
 }
 
