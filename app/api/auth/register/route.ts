@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { z } from "zod";
+import { Resend } from 'resend';
 
 import { prisma } from "@/lib/db";
 import { findUserByEmail, hashPassword } from "@/lib/auth/session";
@@ -12,6 +13,7 @@ import { getClientIp, rateLimit } from "@/lib/security/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const registerSchema = z.object({
   email: z.string().email().max(254),
@@ -24,24 +26,10 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const verifyUrl = `${appUrl}/api/auth/verify?token=${token}`;
 
-  const smtpHost = process.env.SMTP_HOST;
-  if (!smtpHost) {
-    // Dev fallback — log the link so registration still works locally
-    console.info(`[DEV] Email verification link for ${email}: ${verifyUrl}`);
-    return;
-  }
-
-  const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: parseInt(process.env.SMTP_PORT ?? "587", 10),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-  });
-
   const firstName = fullName.split(" ")[0] ?? fullName;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM ?? `Akunta <noreply@akunta.com>`,
+  const { data, error } = await resend.emails.send({
+    from: process.env.EMAIL_FROM ?? `Akunta <noreply@auth.akunta.se>`,
     to: email,
     subject: "Confirm your Akunta account",
     html: `
@@ -61,8 +49,54 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
           This link expires in 24 hours. If you didn't create an account, ignore this email.
         </p>
       </div>
-    `
+    `,
+    replyTo: 'onboarding@resend.dev',
   });
+
+  if (error) {
+    console.error("Failed to send verification email:", error);
+    return;
+  }
+
+  // const smtpHost = process.env.SMTP_HOST;
+  // if (!smtpHost) {
+  //   // Dev fallback — log the link so registration still works locally
+  //   console.info(`[DEV] Email verification link for ${email}: ${verifyUrl}`);
+  //   return;
+  // }
+
+  // const transporter = nodemailer.createTransport({
+  //   host: smtpHost,
+  //   port: parseInt(process.env.SMTP_PORT ?? "587", 10),
+  //   secure: process.env.SMTP_SECURE === "true",
+  //   auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+  // });
+
+  
+
+  // await transporter.sendMail({
+  //   from: process.env.EMAIL_FROM ?? `Akunta <noreply@auth.akunta.se>`,
+  //   to: email,
+  //   subject: "Confirm your Akunta account",
+  //   html: `
+  //     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px">
+  //       <img src="${appUrl}/akunta_logo.png" alt="Akunta" width="48" height="48"
+  //         style="margin-bottom:24px;border-radius:10px" />
+  //       <h2 style="margin:0 0 8px;font-size:22px">Welcome to Akunta, ${firstName}!</h2>
+  //       <p style="color:#555;margin:0 0 24px">
+  //         Click the button below to confirm your email and activate your account.
+  //       </p>
+  //       <a href="${verifyUrl}"
+  //         style="display:inline-block;padding:12px 28px;background:#1a1a1a;color:#fff;
+  //                text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">
+  //         Confirm email
+  //       </a>
+  //       <p style="color:#888;font-size:13px;margin:24px 0 0">
+  //         This link expires in 24 hours. If you didn't create an account, ignore this email.
+  //       </p>
+  //     </div>
+  //   `
+  // });
 }
 
 export async function POST(request: Request) {
