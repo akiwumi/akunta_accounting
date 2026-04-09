@@ -23,9 +23,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     locale === "sv"
       ? {
           title: "Bokföringsöversikt",
-          setupTitle: "Ange ditt skatteår innan du börjar",
+          setupTitle: "Välj ditt skatteår när du är redo",
           setupBody:
-            "För att komma igång behöver du öppna Inställningar och välja vilken månad ditt skatteår börjar. Akunta använder det för dashboarden och dina rapportperioder.",
+            "Du kan redan öppna alla delar av arbetsytan från menyn till vänster. När du vill kan du gå till Inställningar och välja vilken månad ditt skatteår börjar, så att dashboarden och rapportperioderna blir rätt.",
           setupCta: "Öppna inställningar",
           annual: "Årsbokslut (historik)",
           taxYear: "Skatteår",
@@ -48,9 +48,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         }
       : {
           title: "Accounting Dashboard",
-          setupTitle: "Set your tax year before you start",
+          setupTitle: "Set your tax year when you're ready",
           setupBody:
-            "To get started, open Settings and choose which month your tax year begins. Akunta uses that for your dashboard and reporting periods.",
+            "You can already open every area from the left-hand menu. When you're ready, go to Settings and choose which month your tax year begins so the dashboard and reporting periods line up correctly.",
           setupCta: "Open settings",
           annual: "Annual Books (Historical)",
           taxYear: "Tax Year",

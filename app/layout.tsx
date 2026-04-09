@@ -52,7 +52,8 @@ const APP_SHELL_PREFIXES = [
   "/salaries",
   "/compliance",
   "/review",
-  "/settings"
+  "/settings",
+  "/audit"
 ];
 
 function isAppShellRoute(pathname: string): boolean {

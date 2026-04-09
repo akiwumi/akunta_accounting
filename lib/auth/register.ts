@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { swedishSoleTraderDefaultAccounts } from "@/lib/accounting/chartOfAccounts";
+import { isResendConfigured, sendEmailViaResend } from "@/lib/email/resend";
 import { createSmtpTransport, getDefaultEmailFromAddress, getSmtpConfig } from "@/lib/email/smtp";
 import { prisma } from "@/lib/db";
 import { Jurisdictions } from "@/lib/domain/enums";
@@ -51,7 +52,7 @@ function getMailErrorDetails(error: unknown) {
 
 async function sendVerificationEmail(email: string, fullName: string, token: string) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const confirmationUrl = `${appUrl}/api/auth/verify?token=${encodeURIComponent(token)}`;
+  const confirmationUrl = `${appUrl}/welcome?token=${encodeURIComponent(token)}`;
   const logoUrl = `${appUrl}/akunta_logo.png`;
 
   const firstName = fullName.split(" ")[0] ?? fullName;
@@ -157,6 +158,44 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
       html: htmlWithLogo
     });
   } catch (error) {
+    if (isResendConfigured()) {
+      logger.warn("auth.verification_email.smtp_failed_using_resend_fallback", {
+        email,
+        appUrl,
+        smtpHost: smtp.config.host,
+        smtpPort: smtp.config.port,
+        ...getMailErrorDetails(error)
+      });
+
+      try {
+        await sendEmailViaResend({
+          from,
+          to: email,
+          subject: "Bekräfta ditt Akunta-konto | Confirm your Akunta account",
+          text,
+          html
+        });
+
+        logger.info("auth.verification_email.sent", {
+          email,
+          appUrl,
+          provider: "resend_fallback",
+          smtpHost: smtp.config.host
+        });
+        return;
+      } catch (fallbackError) {
+        logger.error("auth.verification_email.resend_fallback_failed", {
+          email,
+          appUrl,
+          confirmationUrl,
+          emailFrom: from,
+          smtpHost: smtp.config.host,
+          smtpPort: smtp.config.port,
+          ...getMailErrorDetails(fallbackError)
+        });
+      }
+    }
+
     logger.error("auth.verification_email.smtp_failed", {
       email,
       appUrl,

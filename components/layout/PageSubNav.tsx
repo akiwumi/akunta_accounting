@@ -90,7 +90,11 @@ const sections: SubNavConfig[] = [
       { href: "/ledger#ledger-entries", label: { en: "Ledger", sv: "Huvudbok" } }
     ]
   },
-  { isMatch: (pathname) => pathname === "/", title: { en: "Dashboard", sv: "Översikt" }, tabs: tabs.dashboard },
+  {
+    isMatch: (pathname) => pathname === "/dashboard" || pathname.startsWith("/dashboard/"),
+    title: { en: "Dashboard", sv: "Översikt" },
+    tabs: tabs.dashboard
+  },
   { isMatch: (pathname) => pathname.startsWith("/receipts"), title: { en: "Receipts", sv: "Kvitton" }, tabs: tabs.receipts },
   { isMatch: (pathname) => pathname.startsWith("/invoices"), title: { en: "Invoices", sv: "Fakturor" }, tabs: tabs.invoices },
   { isMatch: (pathname) => pathname.startsWith("/imports"), title: { en: "Bank CSV", sv: "Bank-CSV" }, tabs: tabs.imports },
@@ -128,8 +132,12 @@ export const PageSubNav = ({ locale }: { locale: Locale }) => {
   }, [pathname]);
 
   const currentSection = useMemo(() => {
-    return sections.find((section) => section.isMatch(pathname)) ?? sections[0];
+    return sections.find((section) => section.isMatch(pathname)) ?? null;
   }, [pathname]);
+
+  if (!currentSection) {
+    return null;
+  }
 
   const isTabActive = (href: string, index: number) => {
     const { path, hash: targetHash } = getHrefParts(href);

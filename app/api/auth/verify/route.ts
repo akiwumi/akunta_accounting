@@ -30,16 +30,8 @@ function setAuthCookie(response: NextResponse, sessionToken: string) {
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const token = searchParams.get("token") ?? "";
-
-  const result = await verifyEmailToken(token);
-  if (!result.ok) {
-    const path = result.code === "no_business" ? "/login?error=no_business" : "/login?error=invalid_token";
-    return NextResponse.redirect(new URL(path, origin));
-  }
-
-  const response = NextResponse.redirect(new URL("/welcome?confirmed=1", origin));
-  setAuthCookie(response, result.sessionToken);
-  return response;
+  const path = token ? `/welcome?token=${encodeURIComponent(token)}` : "/login?error=invalid_token";
+  return NextResponse.redirect(new URL(path, origin));
 }
 
 export async function POST(request: Request) {
