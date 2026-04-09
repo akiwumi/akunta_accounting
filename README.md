@@ -55,6 +55,26 @@ npm run dev
 
 `http://localhost:3000`
 
+## Strato SMTP
+
+To send registration confirmation emails from this app through STRATO, keep `AUTH_EMAIL_PROVIDER="smtp"` and configure:
+
+```env
+NEXT_PUBLIC_APP_URL="https://your-public-app-url"
+SMTP_HOST="smtp.strato.de"
+SMTP_PORT="465"
+SMTP_SECURE="true"
+SMTP_USER="you@your-domain.tld"
+SMTP_PASS="your-strato-mailbox-password"
+EMAIL_FROM="Akunta <you@your-domain.tld>"
+```
+
+Notes:
+
+- STRATO SSL/TLS SMTP uses `smtp.strato.de:465`.
+- STRATO also supports STARTTLS on port `587`, in which case use `SMTP_PORT="587"` and `SMTP_SECURE="false"`.
+- The confirmation link uses `NEXT_PUBLIC_APP_URL`, so this must be your real public app URL, not `localhost`, when users need to click the email link.
+
 ## CSV Import Format
 
 Required columns:

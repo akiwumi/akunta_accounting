@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
 import { z } from "zod";
 
 import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
+import { createSmtpTransport, getDefaultEmailFromAddress, getSmtpConfig } from "@/lib/email/smtp";
 import { loadInvoiceForOutput } from "@/lib/invoices/load";
 import { buildInvoicePdf } from "@/lib/invoices/pdf";
 
@@ -54,17 +54,11 @@ export async function POST(request: Request, context: RouteContext) {
 
   const payload = sendInvoiceEmailSchema.parse(await request.json().catch(() => ({})));
 
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = Number(process.env.SMTP_PORT ?? "587");
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
-  const smtpSecure = process.env.SMTP_SECURE === "true";
-
-  if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+  const smtp = getSmtpConfig();
+  if (!smtp.ok) {
     return NextResponse.json(
       {
-        error:
-          "SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS to enable invoice email."
+        error: `${smtp.error} Set SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS to enable invoice email.`
       },
       { status: 400 }
     );
@@ -121,18 +115,10 @@ export async function POST(request: Request, context: RouteContext) {
     currency: invoice.currency
   }).format(invoice.grossAmount);
 
-  const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpSecure,
-    auth: {
-      user: smtpUser,
-      pass: smtpPass
-    }
-  });
+  const transporter = createSmtpTransport(smtp.config);
 
   const fromAddress =
-    invoice.businessInvoiceEmailFrom?.trim() || process.env.SMTP_FROM?.trim() || smtpUser;
+    getDefaultEmailFromAddress(invoice.businessInvoiceEmailFrom?.trim());
   const subject = payload.subject?.trim() || `Invoice ${invoice.invoiceNumber}`;
   const filename = `invoice-${sanitizeFileNamePart(invoice.invoiceNumber)}.pdf`;
 

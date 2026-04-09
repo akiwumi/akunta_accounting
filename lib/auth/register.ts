@@ -2,10 +2,10 @@ import { randomBytes } from "crypto";
 
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
 import { z } from "zod";
 
 import { swedishSoleTraderDefaultAccounts } from "@/lib/accounting/chartOfAccounts";
+import { createSmtpTransport, getDefaultEmailFromAddress, getSmtpConfig } from "@/lib/email/smtp";
 import { prisma } from "@/lib/db";
 import { Jurisdictions } from "@/lib/domain/enums";
 import { getAuthEmailProvider, sendSupabaseConfirmationEmail } from "@/lib/auth/supabase";
@@ -24,18 +24,17 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
   const welcomeUrl = `${appUrl}/welcome?token=${encodeURIComponent(token)}`;
   const logoUrl = `${appUrl}/akunta_logo.png`;
 
-  const smtpHost = process.env.SMTP_HOST;
-  if (!smtpHost) {
+  const smtp = getSmtpConfig();
+  if (!smtp.ok) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(smtp.error);
+    }
+
     console.info(`[DEV] Email verification link for ${email}: ${welcomeUrl}`);
     return;
   }
 
-  const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: parseInt(process.env.SMTP_PORT ?? "587", 10),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-  });
+  const transporter = createSmtpTransport(smtp.config);
 
   const firstName = fullName.split(" ")[0] ?? fullName;
   const safeFirstName = escapeHtml(firstName);
@@ -43,7 +42,7 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
   const safeLogoUrl = escapeHtml(logoUrl);
 
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM ?? "Akunta <noreply@akunta.com>",
+    from: getDefaultEmailFromAddress(),
     to: email,
     subject: "Bekräfta ditt Akunta-konto | Confirm your Akunta account",
     text: [

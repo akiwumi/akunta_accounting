@@ -17,10 +17,10 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import nodemailer from "nodemailer";
 
 import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
+import { createSmtpTransport, getDefaultEmailFromAddress, getSmtpConfig } from "@/lib/email/smtp";
 import { loadInvoiceForOutput } from "@/lib/invoices/load";
 import { buildInvoicePdf } from "@/lib/invoices/pdf";
 import {
@@ -129,26 +129,18 @@ export async function POST(request: Request, { params }: RouteContext) {
       ? `<p>${data.message.replace(/\n/g, "<br>")}</p>`
       : `<p>Please find your invoice ${invoice.invoiceNumber} attached.</p>`;
 
-    const smtpHost = process.env.SMTP_HOST;
-    if (!smtpHost) {
+    const smtp = getSmtpConfig();
+    if (!smtp.ok) {
       return NextResponse.json(
-        { error: "SMTP is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASS." },
+        { error: smtp.error },
         { status: 503 }
       );
     }
 
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: parseInt(process.env.SMTP_PORT ?? "587", 10),
-      secure: process.env.SMTP_SECURE === "true",
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    const transporter = createSmtpTransport(smtp.config);
 
     await transporter.sendMail({
-      from: process.env.EMAIL_FROM ?? business.invoiceEmailFrom ?? `"${business.name}" <noreply@akunta.com>`,
+      from: getDefaultEmailFromAddress(business.invoiceEmailFrom ?? undefined),
       to: data.to,
       subject,
       html,

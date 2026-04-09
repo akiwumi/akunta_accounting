@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { createSmtpTransport, getDefaultEmailFromAddress, getSmtpConfig } from "@/lib/email/smtp";
 import { getClientIp, rateLimit } from "@/lib/security/rateLimit";
 import { logger } from "@/lib/observability/logger";
 
@@ -38,8 +39,7 @@ export async function POST(request: Request) {
 
   const { name, email, subject, message } = parsed.data;
 
-  // Log the support request — in production, swap this for email delivery
-  // (e.g. via nodemailer to a support inbox) or a ticketing API call.
+  // Always log the support request so it is retained even if mail delivery fails.
   logger.info("support.request.received", {
     name,
     email,
@@ -47,22 +47,14 @@ export async function POST(request: Request) {
     messageLength: message.length
   });
 
-  // If SUPPORT_EMAIL is set, attempt to send via nodemailer
-  if (process.env.SMTP_HOST && process.env.SUPPORT_EMAIL) {
+  // If SMTP + SUPPORT_EMAIL are configured, forward the request to the support inbox as well.
+  const smtp = getSmtpConfig();
+  if (smtp.ok && process.env.SUPPORT_EMAIL) {
     try {
-      const nodemailer = await import("nodemailer");
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT ?? "587"),
-        secure: process.env.SMTP_SECURE === "true",
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        }
-      });
+      const transporter = createSmtpTransport(smtp.config);
 
       await transporter.sendMail({
-        from: `"Akunta Support Form" <${process.env.SMTP_USER ?? "noreply@akunta.app"}>`,
+        from: getDefaultEmailFromAddress(`Akunta Support Form <${smtp.config.user}>`),
         replyTo: `"${name}" <${email}>`,
         to: process.env.SUPPORT_EMAIL,
         subject: `[Support] ${subject}`,
