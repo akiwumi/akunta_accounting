@@ -82,6 +82,12 @@ export function createSmtpTransport(config: SmtpConfig) {
     port: config.port,
     secure: config.secure,
     requireTLS: config.requireTLS,
+    // Fail fast in serverless — default nodemailer timeouts are minutes long
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 30_000,
+    // Strato's certificate chain fails peer validation from AWS/cloud IPs
+    tls: { rejectUnauthorized: false },
     auth: {
       user: config.user,
       pass: config.pass
