@@ -10,6 +10,7 @@ import {
   getUserBusinessId,
   verifyUserCredentials
 } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
 import { getClientIp, rateLimit } from "@/lib/security/rateLimit";
 
 export async function POST(request: Request) {
@@ -62,6 +63,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No business found for this account." }, { status: 403 });
     }
 
+    // Fetch the business locale so it can be set as a cookie at login time
+    const business = await prisma.business.findFirst({
+      where: { memberships: { some: { userId: user.id } } },
+      select: { locale: true }
+    });
+    const locale = business?.locale ?? "en";
+
     const token = await createSession(user.id, businessId);
 
     const response = NextResponse.json({ ok: true, userId: user.id });
@@ -73,6 +81,13 @@ export async function POST(request: Request) {
     };
     response.cookies.set(AUTH_COOKIE_NAME, token, { ...cookieOpts, httpOnly: true });
     response.cookies.set(AUTH_INDICATOR_COOKIE, "1", { ...cookieOpts, httpOnly: false });
+    response.cookies.set("locale", locale, {
+      sameSite: "lax" as const,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      httpOnly: false,
+      maxAge: 60 * 60 * 24 * 365
+    });
 
     return response;
   } catch (error) {

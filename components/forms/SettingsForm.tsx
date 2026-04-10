@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Jurisdictions, type Jurisdiction } from "@/lib/domain/enums";
 import { type Locale } from "@/lib/i18n/locale";
 import { HintTip } from "@/components/ui/HintTip";
+import { useUserPreferences } from "@/components/providers/UserPreferencesProvider";
 
 type SettingsFormProps = {
   locale: Locale;
@@ -208,15 +209,8 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Hints preference — read/write via cookie
-  const [hintsOn, setHintsOn] = useState(true);
-  useEffect(() => {
-    setHintsOn(!document.cookie.split(";").some((c) => c.trim() === "hints=off"));
-  }, []);
-  const toggleHints = (on: boolean) => {
-    setHintsOn(on);
-    document.cookie = `hints=${on ? "on" : "off"}; path=/; max-age=31536000; samesite=lax`;
-  };
+  // Hints preference — read/write via DB-backed context
+  const { hintsEnabled: hintsOn, setHintsEnabled: setHintsOn } = useUserPreferences();
 
   const onImageSelect = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -599,7 +593,7 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
         <button
           type="button"
           className={`hintsToggleBtn${hintsOn ? " hintsToggleBtnOn" : ""}`}
-          onClick={() => toggleHints(!hintsOn)}
+          onClick={() => void setHintsOn(!hintsOn)}
           aria-pressed={hintsOn}
         >
           {hintsOn

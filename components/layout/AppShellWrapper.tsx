@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { AppNav } from "@/components/layout/AppNav";
 import { PageSubNav } from "@/components/layout/PageSubNav";
+import { UserPreferencesProvider } from "@/components/providers/UserPreferencesProvider";
 import { type Locale } from "@/lib/i18n/locale";
 
 const AUTH_PREFIXES = ["/login", "/register", "/sign-in", "/forgot-password", "/reset-password"];
@@ -77,14 +78,16 @@ export function AppShellWrapper({
 
   if (showAppShell) {
     return (
-      <div className="appShell routeFade">
-        <InactivityWatcher />
-        <AppNav locale={locale} />
-        <div className="appMain">
-          <PageSubNav locale={locale} />
-          <main className="container routeFade">{children}</main>
+      <UserPreferencesProvider>
+        <div className="appShell routeFade">
+          <InactivityWatcher />
+          <AppNav locale={locale} />
+          <div className="appMain">
+            <PageSubNav locale={locale} />
+            <main className="container routeFade">{children}</main>
+          </div>
         </div>
-      </div>
+      </UserPreferencesProvider>
     );
   }
 

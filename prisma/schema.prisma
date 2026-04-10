@@ -21,6 +21,7 @@ model User {
   emailVerifiedAt         DateTime?
   passwordResetToken      String?      @unique
   passwordResetExpiresAt  DateTime?
+  hintsEnabled            Boolean      @default(true)
   auditLogs               AuditLog[]
   memberships            Membership[]
   sessions               Session[]
