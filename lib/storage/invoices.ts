@@ -14,7 +14,7 @@ export type StoredInvoicePdf = {
 const LOCAL_ROOT = join(process.cwd(), "uploads", "invoices");
 
 const provider = (): "local" | "supabase" => {
-  if (process.env.STORAGE_PROVIDER === "supabase") return "supabase";
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) return "supabase";
   return "local";
 };
 

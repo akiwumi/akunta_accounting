@@ -28,7 +28,7 @@ export type StoredFile = {
 // ─── Provider detection ───────────────────────────────────────────────────────
 
 const provider = (): "local" | "supabase" => {
-  if (process.env.STORAGE_PROVIDER === "supabase") return "supabase";
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) return "supabase";
   return "local";
 };
 
