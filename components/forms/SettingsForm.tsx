@@ -168,7 +168,7 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
           no: "No"
         };
 
-  const [name, setName] = useState(initial.name);
+  const [name, setName] = useState("");
   const [jurisdiction, setJurisdiction] = useState<Jurisdiction>(initial.jurisdiction);
   const [locale, setLocale] = useState(initial.locale || "en");
   const [baseCurrency, setBaseCurrency] = useState(initial.baseCurrency || "SEK");
@@ -310,7 +310,11 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
       {/* ── Business Basics ─────────────────────────────────────────── */}
       <label className="stack">
         {copy.businessName}
-        <input value={name} onChange={(event) => setName(event.target.value)} />
+        <input
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder={initial.name || (uiLocale === "sv" ? "Ditt företagsnamn" : "Your business name")}
+        />
       </label>
 
       <label className="stack">
@@ -385,7 +389,7 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
       </div>
 
       <h3>{copy.fiscalYearRange}</h3>
-      <div className="row">
+      <div className="row" style={{ alignItems: "flex-end" }}>
         <label className="stack">
           {copy.taxYearFrom}
           <select
@@ -398,7 +402,6 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
               </option>
             ))}
           </select>
-          <HintTip text={copy.taxYearHint} />
         </label>
 
         <label className="stack">
@@ -406,6 +409,7 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
           <input value={monthOptions[fiscalYearEndMonth - 1]?.label ?? ""} readOnly />
         </label>
       </div>
+      <HintTip text={copy.taxYearHint} />
 
       {/* ── Swedish Registration Details ─────────────────────────────── */}
       <h3>{copy.swedishRegSection}</h3>
