@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getRequestLocale } from "@/lib/i18n/locale";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata = {
-  title: "Terms of Service – Akunta",
-  description: "Terms and conditions for using the Akunta bookkeeping service."
-};
+export const metadata = buildPageMetadata({
+  title: "Terms of Service",
+  description: "Terms and conditions for using the Akunta bookkeeping service.",
+  path: "/terms"
+});
 
 export default function TermsPage() {
   const locale = getRequestLocale();

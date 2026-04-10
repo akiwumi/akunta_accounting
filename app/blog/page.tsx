@@ -1,11 +1,13 @@
 import Link from "next/link";
 
 import { blogPosts } from "@/lib/content/blog";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata = {
-  title: "Blog — Akunta",
-  description: "Guides, tips, and updates for Swedish sole traders."
-};
+export const metadata = buildPageMetadata({
+  title: "Blog",
+  description: "Guides, bookkeeping tips, and product updates for Swedish sole traders.",
+  path: "/blog"
+});
 
 const sorted = [...blogPosts].sort((a, b) => b.date.localeCompare(a.date));
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { getHelpArticle, helpArticles } from "@/lib/content/help";
+import { buildPageMetadata } from "@/lib/seo";
 
 type Props = { params: { slug: string } };
 
@@ -12,8 +13,23 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: Props): Metadata {
   const article = getHelpArticle(params.slug);
-  if (!article) return { title: "Not found — Akunta Help" };
-  return { title: `${article.title} — Akunta Help`, description: article.excerpt };
+  if (!article) {
+    return buildPageMetadata({
+      title: "Help Article Not Found",
+      description: "The requested Akunta help article could not be found.",
+      path: `/help/${params.slug}`,
+      noIndex: true
+    });
+  }
+
+  return buildPageMetadata({
+    title: article.title,
+    description: article.excerpt,
+    path: `/help/${article.slug}`,
+    type: "article",
+    section: article.category,
+    authors: ["Akunta Team"]
+  });
 }
 
 export default function HelpArticlePage({ params }: Props) {

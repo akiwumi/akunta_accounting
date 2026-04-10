@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getRequestLocale } from "@/lib/i18n/locale";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata = {
-  title: "Privacy Policy – Akunta",
-  description: "How Akunta collects, uses, and protects your personal data."
-};
+export const metadata = buildPageMetadata({
+  title: "Privacy Policy",
+  description: "How Akunta collects, uses, stores, and protects your personal data.",
+  path: "/privacy"
+});
 
 export default function PrivacyPage() {
   const locale = getRequestLocale();

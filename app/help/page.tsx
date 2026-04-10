@@ -1,11 +1,13 @@
 import Link from "next/link";
 
 import { getHelpArticlesByCategory } from "@/lib/content/help";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata = {
-  title: "Help — Akunta",
-  description: "Guides and how-tos for using Akunta."
-};
+export const metadata = buildPageMetadata({
+  title: "Help Centre",
+  description: "Step-by-step guides for using Akunta receipts, invoicing, VAT reports, payroll, and exports.",
+  path: "/help"
+});
 
 export default function HelpIndexPage() {
   const grouped = getHelpArticlesByCategory();

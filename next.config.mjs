@@ -28,10 +28,47 @@ const securityHeaders = [
   }
 ];
 
+const noIndexHeaders = [
+  { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, nosnippet" }
+];
+
+const noIndexRouteBases = [
+  "/api",
+  "/dashboard",
+  "/receipts",
+  "/invoices",
+  "/imports",
+  "/transactions",
+  "/ledger",
+  "/review",
+  "/reports",
+  "/settings",
+  "/assets",
+  "/audit",
+  "/compliance",
+  "/mileage",
+  "/salaries",
+  "/periodiseringsfond",
+  "/welcome",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password"
+];
+
+const noIndexSources = Array.from(
+  new Set(
+    noIndexRouteBases.flatMap((base) => [base, `${base}/:path*`])
+  )
+);
+
 const nextConfig = {
   ...(distDir ? { distDir } : {}),
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      { source: "/(.*)", headers: securityHeaders },
+      ...noIndexSources.map((source) => ({ source, headers: noIndexHeaders }))
+    ];
   }
 };
 

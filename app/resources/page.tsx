@@ -1,11 +1,13 @@
 import Link from "next/link";
 
 import { resources, getResourceCategories } from "@/lib/content/resources";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata = {
-  title: "Resources — Akunta",
-  description: "Tax, accounting, and compliance resources for Swedish sole traders and EU businesses."
-};
+export const metadata = buildPageMetadata({
+  title: "Resources",
+  description: "Tax, accounting, and compliance resources for Swedish sole traders and EU businesses.",
+  path: "/resources"
+});
 
 // Default to Sweden — in future, resolve from Accept-Language or user profile
 const DEFAULT_COUNTRY = "SE";

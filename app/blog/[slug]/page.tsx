@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { getBlogPost, blogPosts } from "@/lib/content/blog";
+import { buildPageMetadata } from "@/lib/seo";
 
 type Props = { params: { slug: string } };
 
@@ -12,8 +13,25 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: Props): Metadata {
   const post = getBlogPost(params.slug);
-  if (!post) return { title: "Not found — Akunta Blog" };
-  return { title: `${post.title} — Akunta Blog`, description: post.excerpt };
+  if (!post) {
+    return buildPageMetadata({
+      title: "Blog Article Not Found",
+      description: "The requested Akunta blog article could not be found.",
+      path: `/blog/${params.slug}`,
+      noIndex: true
+    });
+  }
+
+  return buildPageMetadata({
+    title: post.title,
+    description: post.excerpt,
+    path: `/blog/${post.slug}`,
+    type: "article",
+    publishedTime: post.date,
+    modifiedTime: post.date,
+    section: "Blog",
+    authors: [post.author]
+  });
 }
 
 export default function BlogArticlePage({ params }: Props) {

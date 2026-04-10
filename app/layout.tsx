@@ -10,6 +10,7 @@ import { AppShellWrapper } from "@/components/layout/AppShellWrapper";
 import { CookieConsentBanner } from "@/components/layout/CookieConsentBanner";
 import { AUTH_COOKIE_NAME } from "@/lib/auth/constants";
 import { getRequestLocale } from "@/lib/i18n/locale";
+import { buildPageMetadata } from "@/lib/seo";
 
 import "./globals.css";
 
@@ -32,8 +33,12 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Akunta",
-  description: "Accounting app for sole traders in Sweden with EU/UK-ready architecture.",
+  ...buildPageMetadata(),
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false
+  },
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",
