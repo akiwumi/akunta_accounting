@@ -149,7 +149,7 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
   const htmlWithLogo = html.replace(escapeHtml(logoUrl), logoSrcFinal);
 
   try {
-    await transporter.sendMail({
+    await sendMailWithRetry(transporter, {
       from,
       to: email,
       subject: "Bekräfta ditt Akunta-konto | Confirm your Akunta account",
@@ -214,6 +214,19 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
     provider: "smtp",
     smtpHost: smtp.config.host
   });
+}
+
+async function sendMailWithRetry(
+  transporter: ReturnType<typeof createSmtpTransport>,
+  options: Parameters<ReturnType<typeof createSmtpTransport>["sendMail"]>[0]
+) {
+  try {
+    await transporter.sendMail(options);
+  } catch {
+    // Wait 2 s then retry once — handles transient Strato connection drops
+    await new Promise((r) => setTimeout(r, 2000));
+    await transporter.sendMail(options);
+  }
 }
 
 function escapeHtml(value: string) {

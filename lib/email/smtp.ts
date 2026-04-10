@@ -89,6 +89,8 @@ export function createSmtpTransport(config: SmtpConfig) {
     // Strato's certificate chain fails peer validation from AWS/cloud IPs
     tls: { rejectUnauthorized: false },
     auth: {
+      // Strato requires LOGIN auth; negotiation can fail from cloud IPs
+      type: "LOGIN",
       user: config.user,
       pass: config.pass
     }
