@@ -39,12 +39,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           vatInput: "Ingående moms (löpande)",
           transactions: "Bokförda transaktioner",
           receipts: "Lagrade kvitton",
-          workflow: "Arbetsflöde",
           exportAccounts: "Exportera hela bokföringen (Excel)",
-          step1: "1. Ladda upp eller vidarebefordra kvitton på sidan Kvitton.",
-          step2: "2. Importera bank-CSV för att bokföra kontantmetodstransaktioner automatiskt.",
-          step3: "3. Skapa P&L, balansräkning, moms, skatteprognos och NE-utkast under Rapporter.",
-          step4: "4. Exportera arbetsboken till Excel för redovisning och deklarationsunderlag."
+          companyDetails: "Företagsuppgifter",
+          completeProfile: "Fyll i dina företagsuppgifter i inställningarna.",
+          openSettings: "Öppna inställningar"
         }
       : {
           title: "Accounting Dashboard",
@@ -64,12 +62,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           vatInput: "Input VAT (Running)",
           transactions: "Transactions Posted",
           receipts: "Receipts Stored",
-          workflow: "Workflow Status",
           exportAccounts: "Export Full Accounts (Excel)",
-          step1: "1. Upload or forward receipts from the Receipts page.",
-          step2: "2. Import bank CSV to auto-post cash-method transactions.",
-          step3: "3. Generate P&L, Balance, VAT, Tax Estimate and NE-bilaga draft under Reports.",
-          step4: "4. Export the workbook to Excel for your accountant and tax return prep."
+          companyDetails: "Company Details",
+          completeProfile: "Complete your company profile in settings.",
+          openSettings: "Open settings"
         };
   const numberLocale = locale === "sv" ? "sv-SE" : "en-GB";
 
@@ -120,13 +116,46 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     receiptCount === 0 &&
     Math.abs(business.updatedAt.getTime() - business.createdAt.getTime()) < 60_000;
 
+  const hasCompanyDetails = Boolean(
+    business.invoiceSenderAddress ||
+    business.vatNumber ||
+    business.invoiceSenderOrgNumber ||
+    business.invoiceSenderPhone ||
+    business.invoiceSenderEmail ||
+    business.invoiceSenderWebsite
+  );
+
   return (
     <section className="page dashboardPage">
       <h1 className="title">{copy.title}</h1>
-      <p className="subtitle dashboardMeta">
-        {business.name} · {business.jurisdiction} · {business.bookkeepingMethod} · VAT {business.vatFrequency} ·{" "}
-        {copy.taxYear} {taxYearLabel}
-      </p>
+
+      {/* Company details card — shown when fields are filled in settings */}
+      <article className="card dashboardCompanyCard">
+        <h2>{copy.companyDetails}</h2>
+        {hasCompanyDetails ? (
+          <div className="dashboardCompanyInfo">
+            <p className="dashboardCompanyName">{business.name}</p>
+            {business.invoiceSenderAddress && (
+              <p className="note" style={{ whiteSpace: "pre-line" }}>{business.invoiceSenderAddress}</p>
+            )}
+            <div className="dashboardCompanyMeta">
+              {business.invoiceSenderOrgNumber && <span>{business.invoiceSenderOrgNumber}</span>}
+              {business.vatNumber && <span>VAT: {business.vatNumber}</span>}
+              {business.invoiceSenderPhone && <span>{business.invoiceSenderPhone}</span>}
+              {business.invoiceSenderEmail && <span>{business.invoiceSenderEmail}</span>}
+              {business.invoiceSenderWebsite && <span>{business.invoiceSenderWebsite}</span>}
+            </div>
+          </div>
+        ) : (
+          <div className="row dashboardSetupActions">
+            <p className="note">{copy.completeProfile}</p>
+            <Link className="button secondary" href="/settings">
+              {copy.openSettings}
+            </Link>
+          </div>
+        )}
+      </article>
+
       {needsInitialTaxYearSetup ? (
         <article className="card dashboardSetupCard">
           <h2>{copy.setupTitle}</h2>
@@ -209,15 +238,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </article>
       </div>
 
-      <article className="card" id="workflow">
-        <h2>{copy.workflow}</h2>
-        <div className="stack dashboardWorkflowList">
-          <p className="note">{copy.step1}</p>
-          <p className="note">{copy.step2}</p>
-          <p className="note">{copy.step3}</p>
-          <p className="note">{copy.step4}</p>
-        </div>
-      </article>
     </section>
   );
 }

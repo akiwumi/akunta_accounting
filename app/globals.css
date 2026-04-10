@@ -452,6 +452,30 @@ a:hover {
   margin-top: 4px;
 }
 
+.dashboardCompanyCard {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboardCompanyInfo {
+  display: grid;
+  gap: 6px;
+}
+
+.dashboardCompanyName {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.dashboardCompanyMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
 .dashboardYearForm {
   align-items: flex-end;
 }

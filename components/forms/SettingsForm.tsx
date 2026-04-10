@@ -83,8 +83,8 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
           invoicing: "Fakturainställningar",
           numberingPattern: "Fakturanummermönster",
           numberingHint: "Använd {YYYY}, {YY}, {MM}, {DD} och {SEQ} eller {SEQ:4}.",
+          companyAddress: "Företagsadress",
           senderName: "Avsändarnamn",
-          senderAddress: "Avsändaradress",
           senderOrgNumber: "Org.nr / Personnummer",
           senderEmail: "Avsändar-e-post",
           senderPhone: "Avsändartelefon",
@@ -142,8 +142,8 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
           invoicing: "Invoice Settings",
           numberingPattern: "Invoice number pattern",
           numberingHint: "Use {YYYY}, {YY}, {MM}, {DD} and {SEQ} or {SEQ:4}.",
+          companyAddress: "Company address",
           senderName: "Sender name",
-          senderAddress: "Sender address",
           senderOrgNumber: "Org. / Personal number",
           senderEmail: "Sender email",
           senderPhone: "Sender phone",
@@ -311,6 +311,16 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
       <label className="stack">
         {copy.businessName}
         <input value={name} onChange={(event) => setName(event.target.value)} />
+      </label>
+
+      <label className="stack">
+        {copy.companyAddress}
+        <textarea
+          rows={3}
+          value={invoiceSenderAddress}
+          onChange={(event) => setInvoiceSenderAddress(event.target.value)}
+          placeholder={uiLocale === "sv" ? "Gatuadress, postnummer, stad" : "Street address, postcode, city"}
+        />
       </label>
 
       <div className="row">
@@ -496,15 +506,6 @@ export const SettingsForm = ({ initial, locale: uiLocale }: SettingsFormProps) =
           <input type="email" value={invoiceEmailFrom} onChange={(event) => setInvoiceEmailFrom(event.target.value)} />
         </label>
       </div>
-
-      <label className="stack">
-        {copy.senderAddress}
-        <textarea
-          rows={3}
-          value={invoiceSenderAddress}
-          onChange={(event) => setInvoiceSenderAddress(event.target.value)}
-        />
-      </label>
 
       <div className="row">
         <label className="stack">

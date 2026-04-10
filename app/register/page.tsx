@@ -8,6 +8,7 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -16,14 +17,20 @@ export default function RegisterPage() {
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
-    setIsSubmitting(true);
 
     const formData = new FormData(e.currentTarget);
     const submittedFullName = String(formData.get("fullName") ?? "").trim();
     const submittedEmail = String(formData.get("email") ?? "").trim();
     const submittedPassword = String(formData.get("password") ?? "");
+    const submittedConfirmPassword = String(formData.get("confirmPassword") ?? "");
     const submittedBusinessName = String(formData.get("businessName") ?? "").trim();
 
+    if (submittedPassword !== submittedConfirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setIsSubmitting(true);
     setFullName(submittedFullName);
     setEmail(submittedEmail);
     setPassword(submittedPassword);
@@ -123,6 +130,20 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="8+ characters"
+              />
+            </label>
+
+            <label className="stack">
+              Confirm password
+              <input
+                name="confirmPassword"
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repeat your password"
               />
             </label>
 

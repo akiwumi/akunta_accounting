@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { Inter, Manrope, Noto_Serif } from "next/font/google";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { ReactNode } from "react";
 
 import { AppNav } from "@/components/layout/AppNav";
 import { PageSubNav } from "@/components/layout/PageSubNav";
+import { AUTH_COOKIE_NAME } from "@/lib/auth/constants";
 import { getRequestLocale } from "@/lib/i18n/locale";
 
 import "./globals.css";
@@ -69,9 +70,13 @@ function isAuthRoute(pathname: string): boolean {
 export default function RootLayout({ children }: { children: ReactNode }) {
   const locale = getRequestLocale();
   const pathname = headers().get("x-pathname") ?? "/";
+  const hasSession = Boolean(cookies().get(AUTH_COOKIE_NAME)?.value);
 
   const authRoute = isAuthRoute(pathname);
-  const appShell = isAppShellRoute(pathname);
+  // Show app shell whenever the user is authenticated and not on an auth page.
+  // Falling back to cookie-based detection ensures the sidebar renders even if
+  // the x-pathname header is not forwarded (e.g. during certain Vercel edge runs).
+  const appShell = (isAppShellRoute(pathname) || hasSession) && !authRoute;
 
   return (
     <html lang={locale} className={`${manrope.variable} ${notoSerif.variable} ${inter.variable}`}>
