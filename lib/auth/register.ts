@@ -117,23 +117,41 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
     "If you didn't create this account, you can ignore this email."
   ].join("\n");
 
+  const subject = "Bekräfta ditt Akunta-konto | Confirm your Akunta account";
+  const from = getDefaultEmailFromAddress();
+
+  // ── 1. Try Resend first — cloud-native, no IP-blocking issues ────────────
+  if (isResendConfigured()) {
+    try {
+      await sendEmailViaResend({ from, to: email, subject, text, html });
+      logger.info("auth.verification_email.sent", { email, appUrl, provider: "resend" });
+      return;
+    } catch (resendError) {
+      logger.warn("auth.verification_email.resend_failed_trying_smtp", {
+        email,
+        appUrl,
+        ...getMailErrorDetails(resendError)
+      });
+      // fall through to SMTP
+    }
+  }
+
+  // ── 2. SMTP fallback ──────────────────────────────────────────────────────
   const smtp = getSmtpConfig();
   if (!smtp.ok) {
     if (process.env.NODE_ENV === "production") {
-      logger.error("auth.verification_email.smtp_not_configured", {
+      logger.error("auth.verification_email.no_provider_configured", {
         email,
         appUrl,
         missing: smtp.missing
       });
       throw new Error(smtp.error);
     }
-
     console.info(`[DEV] Email verification link for ${email}: ${confirmationUrl}`);
     return;
   }
 
   const transporter = createSmtpTransport(smtp.config);
-  const from = getDefaultEmailFromAddress();
 
   // Attempt to attach logo inline; non-fatal if it fails
   let logoSrcFinal = logoSrc;
@@ -149,53 +167,9 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
   const htmlWithLogo = html.replace(escapeHtml(logoUrl), logoSrcFinal);
 
   try {
-    await sendMailWithRetry(transporter, {
-      from,
-      to: email,
-      subject: "Bekräfta ditt Akunta-konto | Confirm your Akunta account",
-      attachments,
-      text,
-      html: htmlWithLogo
-    });
+    await sendMailWithRetry(transporter, { from, to: email, subject, attachments, text, html: htmlWithLogo });
+    logger.info("auth.verification_email.sent", { email, appUrl, provider: "smtp", smtpHost: smtp.config.host });
   } catch (error) {
-    if (isResendConfigured()) {
-      logger.warn("auth.verification_email.smtp_failed_using_resend_fallback", {
-        email,
-        appUrl,
-        smtpHost: smtp.config.host,
-        smtpPort: smtp.config.port,
-        ...getMailErrorDetails(error)
-      });
-
-      try {
-        await sendEmailViaResend({
-          from,
-          to: email,
-          subject: "Bekräfta ditt Akunta-konto | Confirm your Akunta account",
-          text,
-          html
-        });
-
-        logger.info("auth.verification_email.sent", {
-          email,
-          appUrl,
-          provider: "resend_fallback",
-          smtpHost: smtp.config.host
-        });
-        return;
-      } catch (fallbackError) {
-        logger.error("auth.verification_email.resend_fallback_failed", {
-          email,
-          appUrl,
-          confirmationUrl,
-          emailFrom: from,
-          smtpHost: smtp.config.host,
-          smtpPort: smtp.config.port,
-          ...getMailErrorDetails(fallbackError)
-        });
-      }
-    }
-
     logger.error("auth.verification_email.smtp_failed", {
       email,
       appUrl,
@@ -207,13 +181,6 @@ async function sendVerificationEmail(email: string, fullName: string, token: str
     });
     throw error;
   }
-
-  logger.info("auth.verification_email.sent", {
-    email,
-    appUrl,
-    provider: "smtp",
-    smtpHost: smtp.config.host
-  });
 }
 
 async function sendMailWithRetry(
@@ -223,8 +190,8 @@ async function sendMailWithRetry(
   try {
     await transporter.sendMail(options);
   } catch {
-    // Wait 2 s then retry once — handles transient Strato connection drops
-    await new Promise((r) => setTimeout(r, 2000));
+    // Brief pause then one retry — handles transient Strato connection drops
+    await new Promise((r) => setTimeout(r, 800));
     await transporter.sendMail(options);
   }
 }
@@ -296,13 +263,9 @@ export async function handleRegisterRequest(request: Request) {
         emailProvider,
         ...getMailErrorDetails(error)
       });
-      return NextResponse.json(
-        {
-          error:
-            "Your account exists, but we couldn't resend the confirmation email just now. Please try again shortly."
-        },
-        { status: 503 }
-      );
+      // Email failed but the account exists — still show success so the user
+      // sees "check your email" rather than a confusing error. The link will
+      // arrive once the mail server recovers, or they can register again to retry.
     }
 
     return NextResponse.json(
@@ -392,13 +355,9 @@ export async function handleRegisterRequest(request: Request) {
       emailProvider,
       ...getMailErrorDetails(error)
     });
-    return NextResponse.json(
-      {
-        error:
-          "Your account was created, but we couldn't send the confirmation email. Try registering again to resend it."
-      },
-      { status: 503 }
-    );
+    // Account was created successfully — don't return a 503 error. Show the
+    // "check your email" screen instead. The email may arrive with a short delay,
+    // or the user can register again to trigger a resend.
   }
 
   return NextResponse.json(

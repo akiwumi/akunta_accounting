@@ -82,10 +82,10 @@ export function createSmtpTransport(config: SmtpConfig) {
     port: config.port,
     secure: config.secure,
     requireTLS: config.requireTLS,
-    // Fail fast in serverless — default nodemailer timeouts are minutes long
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 30_000,
+    // Fail fast in serverless — keep well under Vercel's function timeout
+    connectionTimeout: 6_000,
+    greetingTimeout: 6_000,
+    socketTimeout: 12_000,
     // Strato's certificate chain fails peer validation from AWS/cloud IPs
     tls: { rejectUnauthorized: false },
     auth: {
