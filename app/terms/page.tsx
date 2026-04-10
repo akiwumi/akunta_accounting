@@ -75,7 +75,7 @@ export default function TermsPage() {
           <section>
             <h2>7. Ansvarsbegränsning</h2>
             <p>
-              Akunta tillhandahålls "i befintligt skick". Vi ansvarar inte för indirekta skador,
+              Akunta tillhandahålls &quot;i befintligt skick&quot;. Vi ansvarar inte för indirekta skador,
               utebliven vinst eller ekonomiska förluster till följd av din användning av tjänsten.
               Vårt totala ansvar är begränsat till det belopp du betalat under de senaste 12 månaderna.
             </p>
@@ -138,7 +138,7 @@ export default function TermsPage() {
         <section>
           <h2>4. Intellectual property</h2>
           <p>
-            The Akunta platform's code, design and brand belong to Akunta.
+            The Akunta platform&apos;s code, design and brand belong to Akunta.
             Your accounting data belongs to you. We process it solely to provide the service.
           </p>
         </section>
@@ -164,7 +164,7 @@ export default function TermsPage() {
         <section>
           <h2>7. Limitation of liability</h2>
           <p>
-            Akunta is provided "as is". We are not liable for indirect damages, lost profits or financial
+            Akunta is provided &quot;as is&quot;. We are not liable for indirect damages, lost profits or financial
             losses resulting from your use of the service. Our total liability is limited to the amount
             you have paid in the previous 12 months.
           </p>

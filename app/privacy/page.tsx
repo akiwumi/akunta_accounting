@@ -71,7 +71,7 @@ export default function PrivacyPage() {
             <ul>
               <li>Begära tillgång till dina personuppgifter</li>
               <li>Begära rättelse av felaktiga uppgifter</li>
-              <li>Begära radering ("rätten att bli glömd"), med förbehåll för lagstadgade krav</li>
+              <li>Begära radering (&quot;rätten att bli glömd&quot;), med förbehåll för lagstadgade krav</li>
               <li>Begära begränsning av behandlingen</li>
               <li>Invända mot behandling baserad på berättigat intresse</li>
               <li>Dataportabilitet – exportera dina uppgifter i maskinläsbart format</li>
@@ -169,7 +169,7 @@ export default function PrivacyPage() {
           <ul>
             <li>Request access to your personal data</li>
             <li>Request correction of inaccurate data</li>
-            <li>Request erasure ("right to be forgotten"), subject to legal retention requirements</li>
+            <li>Request erasure (&quot;right to be forgotten&quot;), subject to legal retention requirements</li>
             <li>Request restriction of processing</li>
             <li>Object to processing based on legitimate interest</li>
             <li>Data portability — export your data in machine-readable format</li>
