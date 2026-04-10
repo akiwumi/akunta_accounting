@@ -17,9 +17,11 @@ model User {
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
   bankIdSubject          String?      @unique
-  emailVerificationToken String?      @unique
-  emailVerifiedAt        DateTime?
-  auditLogs              AuditLog[]
+  emailVerificationToken  String?      @unique
+  emailVerifiedAt         DateTime?
+  passwordResetToken      String?      @unique
+  passwordResetExpiresAt  DateTime?
+  auditLogs               AuditLog[]
   memberships            Membership[]
   sessions               Session[]
 }

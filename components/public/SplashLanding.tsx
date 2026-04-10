@@ -41,10 +41,12 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
   const [phase, setPhase] = useState<"splash" | "fade" | "landing">("splash");
   // Read locale from cookie client-side (cookie may differ from server initial)
   const [locale, setLocale] = useState(initialLocale);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     const cookie = document.cookie.split(";").find((c) => c.trim().startsWith("locale="));
     if (cookie) setLocale(cookie.split("=")[1]?.trim() ?? initialLocale);
+    setIsLoggedIn(document.cookie.split(";").some((c) => c.trim().startsWith("akunta_session=")));
   }, [initialLocale]);
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
         heroSub: "Akunta hanterar kvitton, fakturor, bankimport, moms och löner på ett ställe. Svenska regler inbyggda.",
         startFree: "Kom igång gratis",
         signIn: "Logga in",
+        dashboard: "Till översikten",
         featuresTitle: "Allt du behöver. Ingenting du inte behöver.",
         testimonialsTitle: "Vad egenföretagare säger",
         blogTitle: "Senast från bloggen",
@@ -92,6 +95,7 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
         heroSub: "Akunta handles receipts, invoices, bank imports, VAT, and payroll in one place. Swedish rules built in. No accountant required for day-to-day books.",
         startFree: "Start free",
         signIn: "Sign in",
+        dashboard: "Go to Dashboard",
         featuresTitle: "Everything you need. Nothing you don't.",
         testimonialsTitle: "What sole traders say",
         blogTitle: "Latest from the blog",
@@ -136,7 +140,9 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
           </nav>
           <div className="publicNavRight">
             <LanguageSwitcher current={locale} />
-            <Link href="/login" className="button publicNavCta">{copy.signIn}</Link>
+            {isLoggedIn
+              ? <Link href="/dashboard" className="button publicNavCta">{copy.dashboard}</Link>
+              : <Link href="/login" className="button publicNavCta">{copy.signIn}</Link>}
           </div>
         </div>
       </header>
@@ -147,8 +153,14 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
           <h1 className="publicHeroTitle">{copy.heroTitle}</h1>
           <p className="publicHeroSubtitle">{copy.heroSub}</p>
           <div className="publicHeroCtas">
-            <Link href="/register" className="button publicHeroCtaPrimary">{copy.startFree}</Link>
-            <Link href="/login" className="button tertiary">{copy.signIn}</Link>
+            {isLoggedIn ? (
+              <Link href="/dashboard" className="button publicHeroCtaPrimary">{copy.dashboard}</Link>
+            ) : (
+              <>
+                <Link href="/register" className="button publicHeroCtaPrimary">{copy.startFree}</Link>
+                <Link href="/login" className="button tertiary">{copy.signIn}</Link>
+              </>
+            )}
           </div>
         </div>
         <div className="publicHeroImage" aria-hidden>

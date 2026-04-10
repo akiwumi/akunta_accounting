@@ -10,6 +10,7 @@ import { type Locale } from "@/lib/i18n/locale";
 
 const links = [
   // ── Main bookkeeping ──────────────────────────────────────────────────
+  { href: "/", icon: "HM", group: "main", labels: { en: "Home", sv: "Hem" } },
   { href: "/dashboard", icon: "DB", group: "main", labels: { en: "Dashboard", sv: "Översikt" } },
   { href: "/receipts", icon: "RC", group: "main", labels: { en: "Receipts", sv: "Kvitton" } },
   { href: "/invoices", icon: "IV", group: "main", labels: { en: "Invoices", sv: "Fakturor" } },
@@ -24,9 +25,10 @@ const links = [
   { href: "/periodiseringsfond", icon: "PF", group: "tax", labels: { en: "Tax Reserves", sv: "Periodiseringsfond" } },
   { href: "/compliance", icon: "CK", group: "tax", labels: { en: "Compliance", sv: "Kravlista" } },
   { href: "/audit", icon: "AL", group: "tax", labels: { en: "Audit Trail", sv: "Revisionslogg" } },
-  // ── Reports & settings ────────────────────────────────────────────────
+  // ── Reports, settings & support ───────────────────────────────────────
   { href: "/reports", icon: "RP", group: "other", labels: { en: "Reports", sv: "Rapporter" } },
-  { href: "/settings", icon: "ST", group: "other", labels: { en: "Settings", sv: "Inställningar" } }
+  { href: "/settings", icon: "ST", group: "other", labels: { en: "Settings", sv: "Inställningar" } },
+  { href: "/support", icon: "SP", group: "other", labels: { en: "Support", sv: "Support" } }
 ] as const;
 
 const copy = {
@@ -61,7 +63,7 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActiveLink = (href: string) => {
-    if (href === "/dashboard") return pathname === "/dashboard";
+    if (href === "/" || href === "/dashboard") return pathname === href;
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
@@ -119,10 +121,10 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
     <>
       {/* Desktop / tablet sidebar */}
       <aside className="sideNav sideNavDesktop">
-        <div className="sideNavBrand">
+        <Link href="/" className="sideNavBrand">
           <Image src="/akunta_logo.png" alt="Akunta" width={610} height={614} className="brandLogoFull" priority />
           <p className="brandSubline">Bookkeeping Accounting</p>
-        </div>
+        </Link>
         {navLinks}
       </aside>
 
@@ -154,10 +156,10 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
         />
       )}
       <aside className={`mobileNavDrawer${mobileOpen ? " mobileNavDrawerOpen" : ""}`} aria-label="Navigation">
-        <div className="sideNavBrand mobileDrawerBrand">
+        <Link href="/" className="sideNavBrand mobileDrawerBrand" onClick={() => setMobileOpen(false)}>
           <Image src="/akunta_logo.png" alt="Akunta" width={36} height={36} className="brandLogoFull" />
           <p className="brandSubline">Bookkeeping Accounting</p>
-        </div>
+        </Link>
         {navLinks}
       </aside>
     </>

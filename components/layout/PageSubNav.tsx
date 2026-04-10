@@ -21,9 +21,9 @@ type SubNavConfig = {
 
 const tabs = {
   dashboard: [
-    { href: "/#summary-kpis", label: { en: "Summary", sv: "Sammanfattning" } },
-    { href: "/#activity-summary", label: { en: "Activity", sv: "Aktivitet" } },
-    { href: "/#workflow", label: { en: "Workflow", sv: "Arbetsflöde" } }
+    { href: "/dashboard", label: { en: "Summary", sv: "Sammanfattning" } },
+    { href: "/dashboard/activity", label: { en: "Activity", sv: "Aktivitet" } },
+    { href: "/dashboard/workflow", label: { en: "Workflow", sv: "Arbetsflöde" } }
   ],
   receipts: [
     { href: "/receipts#upload", label: { en: "Upload", sv: "Uppladdning" } },
@@ -69,7 +69,8 @@ const tabs = {
   ],
   settings: [
     { href: "/settings#business-settings", label: { en: "Business", sv: "Företag" } },
-    { href: "/settings#tax-config", label: { en: "Tax Config", sv: "Skatteinställningar" } }
+    { href: "/settings#tax-config", label: { en: "Tax Config", sv: "Skatteinställningar" } },
+    { href: "/settings#security", label: { en: "Security", sv: "Säkerhet" } }
   ]
 } as const;
 
@@ -141,11 +142,12 @@ export const PageSubNav = ({ locale }: { locale: Locale }) => {
 
   const isTabActive = (href: string, index: number) => {
     const { path, hash: targetHash } = getHrefParts(href);
+    // For pure path tabs (no hash), do exact match — avoids /dashboard matching /dashboard/activity
+    if (!targetHash) return pathname === path;
     const pathMatch =
       path === "/" ? pathname === "/" : pathname === path || (path !== "/" && pathname.startsWith(`${path}/`));
     if (!pathMatch) return false;
-    if (targetHash) return hash === targetHash || (hash === "" && index === 0);
-    return true;
+    return hash === targetHash || (hash === "" && index === 0);
   };
 
   return (

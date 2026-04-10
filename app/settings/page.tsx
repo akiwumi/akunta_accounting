@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { SettingsForm } from "@/components/forms/SettingsForm";
+import { ChangePasswordForm } from "@/components/forms/ChangePasswordForm";
 import { SectionExportBar } from "@/components/layout/SectionExportBar";
 import { asNumber } from "@/lib/accounting/math";
 import { ensureBusiness } from "@/lib/data/business";
@@ -79,6 +80,10 @@ export default async function SettingsPage() {
             }}
           />
         </div>
+      </article>
+
+      <article className="card" id="security">
+        <ChangePasswordForm locale={locale} />
       </article>
     </section>
   );

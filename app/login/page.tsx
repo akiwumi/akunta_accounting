@@ -9,9 +9,13 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const errorParam = searchParams.get("error");
+  const resetParam = searchParams.get("reset");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [successMsg] = useState<string | null>(
+    resetParam === "success" ? "Password updated. Sign in with your new credentials." : null
+  );
   const [error, setError] = useState<string | null>(
     errorParam === "invalid_token" ? "That verification link is invalid or has expired." :
     errorParam === "no_business"   ? "Account setup incomplete. Please contact support." : null
@@ -107,11 +111,16 @@ export default function LoginPage() {
             </div>
           </label>
 
+          {successMsg && <p className="success">{successMsg}</p>}
           {error && <p className="error">{error}</p>}
 
           <button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Signing in…" : "Sign in"}
           </button>
+
+          <p className="authAltLine">
+            <Link href="/forgot-password" className="textLink">Forgot password?</Link>
+          </p>
 
           <p className="authAltLine">
             Don&apos;t have an account?{" "}

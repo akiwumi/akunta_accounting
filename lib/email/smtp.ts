@@ -108,5 +108,5 @@ export function getDefaultEmailFromAddress(preferredFrom?: string) {
     return smtp.config.from;
   }
 
-  return "Akunta <noreply@akunta.com>";
+  return "Akunta <noreply@akunta.se>";
 }
