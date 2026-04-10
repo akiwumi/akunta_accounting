@@ -18,7 +18,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",
-      // Sentry error reporting + Vercel Analytics
+      // Sentry tunnel route is same-origin; ingest fallback for direct reporting
       "connect-src 'self' https://*.sentry.io https://*.ingest.sentry.io https://va.vercel-scripts.com",
       "frame-src https://js.stripe.com https://hooks.stripe.com",
       "object-src 'none'",
@@ -36,20 +36,20 @@ const nextConfig = {
 };
 
 export default withSentryConfig(nextConfig, {
+  // Sentry org/project for source map uploads (set in Vercel env vars)
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
-
-  // Only upload source maps when DSN is configured (avoids build warnings)
-  silent: true,
-  disableLogger: true,
-
-  // Don't fail the build if Sentry auth token is missing
   authToken: process.env.SENTRY_AUTH_TOKEN,
 
-  widenClientFileUpload: true,
-  hideSourceMaps: true,
+  // Tunnel Sentry requests through your own domain — avoids ad blockers
   tunnelRoute: "/monitoring-tunnel",
 
-  // Disable Sentry completely at build time if no DSN is set
-  ...(process.env.NEXT_PUBLIC_SENTRY_DSN ? {} : { disableClientWebpackPlugin: true, disableServerWebpackPlugin: true })
+  // Keep source maps off the CDN (uploaded to Sentry only)
+  hideSourceMaps: true,
+
+  // Suppress build-time Sentry CLI output
+  silent: !process.env.CI,
+
+  // Automatically instrument React components for better error context
+  reactComponentAnnotation: { enabled: true }
 });
