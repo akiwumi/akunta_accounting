@@ -9,7 +9,7 @@ import { UserPreferencesProvider } from "@/components/providers/UserPreferencesP
 import { type Locale } from "@/lib/i18n/locale";
 
 const AUTH_PREFIXES = ["/login", "/register", "/sign-in", "/forgot-password", "/reset-password"];
-const PUBLIC_PREFIXES = ["/blog", "/help", "/support", "/resources", "/pricing", "/welcome"];
+const PUBLIC_PREFIXES = ["/blog", "/help", "/support", "/resources", "/pricing", "/welcome", "/privacy", "/terms"];
 
 const INACTIVITY_MS = 15 * 60 * 1000; // 15 minutes
 

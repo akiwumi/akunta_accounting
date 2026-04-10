@@ -3,7 +3,11 @@ import { Inter, Manrope, Noto_Serif } from "next/font/google";
 import { cookies } from "next/headers";
 import { ReactNode } from "react";
 
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+
 import { AppShellWrapper } from "@/components/layout/AppShellWrapper";
+import { CookieConsentBanner } from "@/components/layout/CookieConsentBanner";
 import { AUTH_COOKIE_NAME } from "@/lib/auth/constants";
 import { getRequestLocale } from "@/lib/i18n/locale";
 
@@ -47,6 +51,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <AppShellWrapper locale={locale} hasSession={hasSession}>
           {children}
         </AppShellWrapper>
+        <CookieConsentBanner />
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

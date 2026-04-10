@@ -21,7 +21,7 @@ const PUBLIC_API_ROUTES = [
 // Public site routes — no session required, available to anyone
 const PUBLIC_SITE_PREFIXES = [
   "/", "/blog", "/help", "/support", "/resources", "/pricing", "/welcome",
-  "/forgot-password", "/reset-password"
+  "/forgot-password", "/reset-password", "/privacy", "/terms"
 ];
 
 function isAuthRoute(pathname: string): boolean {

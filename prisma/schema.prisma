@@ -22,6 +22,7 @@ model User {
   passwordResetToken      String?      @unique
   passwordResetExpiresAt  DateTime?
   hintsEnabled            Boolean      @default(true)
+  cookieConsent           String?      // "all" | "essential"
   auditLogs               AuditLog[]
   memberships            Membership[]
   sessions               Session[]

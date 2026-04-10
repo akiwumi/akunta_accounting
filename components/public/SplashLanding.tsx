@@ -271,6 +271,8 @@ export function SplashLanding({ latestPosts, locale: initialLocale, isLoggedIn =
             <Link href="/blog">{copy.blog}</Link>
             <Link href="/resources">{copy.resources}</Link>
             <Link href="/support">{copy.support}</Link>
+            <Link href="/privacy">{sv ? "Integritetspolicy" : "Privacy"}</Link>
+            <Link href="/terms">{sv ? "Villkor" : "Terms"}</Link>
             {isLoggedIn
               ? <Link href="/dashboard">{copy.dashboard}</Link>
               : <Link href="/login">{copy.signIn}</Link>}
