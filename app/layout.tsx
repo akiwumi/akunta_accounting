@@ -63,8 +63,18 @@ function isAppShellRoute(pathname: string): boolean {
   );
 }
 
+// Routes that never get the app shell, even when the user is authenticated
+const PUBLIC_PREFIXES = ["/", "/login", "/register", "/sign-in", "/welcome", "/blog", "/help", "/support", "/resources", "/pricing"];
+
 function isAuthRoute(pathname: string): boolean {
   return pathname.startsWith("/login") || pathname.startsWith("/register") || pathname.startsWith("/sign-in");
+}
+
+function isPublicPage(pathname: string): boolean {
+  if (pathname === "/") return true;
+  return PUBLIC_PREFIXES.filter((p) => p !== "/").some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  );
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -73,10 +83,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   const hasSession = Boolean(cookies().get(AUTH_COOKIE_NAME)?.value);
 
   const authRoute = isAuthRoute(pathname);
-  // Show app shell whenever the user is authenticated and not on an auth page.
-  // Falling back to cookie-based detection ensures the sidebar renders even if
-  // the x-pathname header is not forwarded (e.g. during certain Vercel edge runs).
-  const appShell = (isAppShellRoute(pathname) || hasSession) && !authRoute;
+  // Show app shell for known app routes. The session cookie acts as a fallback
+  // for cases where the x-pathname header is not forwarded (e.g. certain Vercel
+  // edge runs), but only for non-public, non-auth routes.
+  const appShell = !authRoute && !isPublicPage(pathname) &&
+    (isAppShellRoute(pathname) || hasSession);
 
   return (
     <html lang={locale} className={`${manrope.variable} ${notoSerif.variable} ${inter.variable}`}>
