@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { AUTH_COOKIE_MAX_AGE_SECONDS, AUTH_COOKIE_NAME } from "@/lib/auth/session";
+import { AUTH_COOKIE_MAX_AGE_SECONDS, AUTH_COOKIE_NAME, AUTH_INDICATOR_COOKIE } from "@/lib/auth/session";
 import { verifyEmailToken } from "@/lib/auth/verify";
 
 export const runtime = "nodejs";
@@ -17,14 +17,15 @@ const verificationBodySchema = z.object({
   token: z.string().trim().min(32)
 });
 
-function setAuthCookie(response: NextResponse, sessionToken: string) {
-  response.cookies.set(AUTH_COOKIE_NAME, sessionToken, {
-    httpOnly: true,
-    sameSite: "lax",
+function setAuthCookies(response: NextResponse, sessionToken: string) {
+  const base = {
+    sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: AUTH_COOKIE_MAX_AGE_SECONDS
-  });
+  };
+  response.cookies.set(AUTH_COOKIE_NAME, sessionToken, { ...base, httpOnly: true });
+  response.cookies.set(AUTH_INDICATOR_COOKIE, "1", { ...base, httpOnly: false });
 }
 
 export async function GET(request: Request) {
@@ -58,6 +59,6 @@ export async function POST(request: Request) {
   }
 
   const response = NextResponse.json({ ok: true, firstName: result.firstName });
-  setAuthCookie(response, result.sessionToken);
+  setAuthCookies(response, result.sessionToken);
   return response;
 }

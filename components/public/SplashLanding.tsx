@@ -10,6 +10,7 @@ import type { BlogPost } from "@/lib/content/blog";
 type Props = {
   latestPosts: BlogPost[];
   locale: string;
+  isLoggedIn?: boolean;
 };
 
 const FEATURES_EN = [
@@ -37,17 +38,20 @@ const TESTIMONIALS = [
   { quote: "Switching from a spreadsheet felt scary. Akunta made it obvious. I was up and running in an afternoon.", author: "Petra M.", role: "Therapist, Linköping" }
 ];
 
-export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
+export function SplashLanding({ latestPosts, locale: initialLocale, isLoggedIn = false }: Props) {
   const [phase, setPhase] = useState<"splash" | "fade" | "landing">("splash");
   // Read locale from cookie client-side (cookie may differ from server initial)
   const [locale, setLocale] = useState(initialLocale);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     const cookie = document.cookie.split(";").find((c) => c.trim().startsWith("locale="));
     if (cookie) setLocale(cookie.split("=")[1]?.trim() ?? initialLocale);
-    setIsLoggedIn(document.cookie.split(";").some((c) => c.trim().startsWith("akunta_session=")));
   }, [initialLocale]);
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.reload();
+  };
 
   useEffect(() => {
     // Skip splash if already seen this session (e.g. after a language change reload)
@@ -75,6 +79,7 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
         startFree: "Kom igång gratis",
         signIn: "Logga in",
         dashboard: "Till översikten",
+        logout: "Logga ut",
         featuresTitle: "Allt du behöver. Ingenting du inte behöver.",
         testimonialsTitle: "Vad egenföretagare säger",
         blogTitle: "Senast från bloggen",
@@ -96,6 +101,7 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
         startFree: "Start free",
         signIn: "Sign in",
         dashboard: "Go to Dashboard",
+        logout: "Log out",
         featuresTitle: "Everything you need. Nothing you don't.",
         testimonialsTitle: "What sole traders say",
         blogTitle: "Latest from the blog",
@@ -140,9 +146,14 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
           </nav>
           <div className="publicNavRight">
             <LanguageSwitcher current={locale} />
-            {isLoggedIn
-              ? <Link href="/dashboard" className="button publicNavCta">{copy.dashboard}</Link>
-              : <Link href="/login" className="button publicNavCta">{copy.signIn}</Link>}
+            {isLoggedIn ? (
+              <>
+                <Link href="/dashboard" className="button publicNavCta">{copy.dashboard}</Link>
+                <button type="button" className="button tertiary" onClick={handleLogout}>{copy.logout}</button>
+              </>
+            ) : (
+              <Link href="/login" className="button publicNavCta">{copy.signIn}</Link>
+            )}
           </div>
         </div>
       </header>
@@ -154,7 +165,10 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
           <p className="publicHeroSubtitle">{copy.heroSub}</p>
           <div className="publicHeroCtas">
             {isLoggedIn ? (
-              <Link href="/dashboard" className="button publicHeroCtaPrimary">{copy.dashboard}</Link>
+              <>
+                <Link href="/dashboard" className="button publicHeroCtaPrimary">{copy.dashboard}</Link>
+                <button type="button" className="button tertiary" onClick={handleLogout}>{copy.logout}</button>
+              </>
             ) : (
               <>
                 <Link href="/register" className="button publicHeroCtaPrimary">{copy.startFree}</Link>
@@ -182,10 +196,12 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
             ))}
           </div>
           {/* CTA inside features section */}
-          <div className="publicSectionAction">
-            <Link href="/register" className="button publicHeroCtaPrimary">{copy.startFree}</Link>
-            <Link href="/pricing" className="button tertiary">{copy.pricing}</Link>
-          </div>
+          {!isLoggedIn && (
+            <div className="publicSectionAction">
+              <Link href="/register" className="button publicHeroCtaPrimary">{copy.startFree}</Link>
+              <Link href="/pricing" className="button tertiary">{copy.pricing}</Link>
+            </div>
+          )}
         </div>
       </section>
 
@@ -231,14 +247,16 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
         </div>
       </section>
 
-      {/* CTA banner */}
-      <section className="publicCtaBanner">
-        <div className="publicCtaBannerInner">
-          <h2>{copy.ctaTitle}</h2>
-          <p>{copy.ctaSub}</p>
-          <Link href="/register" className="button publicHeroCtaPrimary">{copy.ctaBtn}</Link>
-        </div>
-      </section>
+      {/* CTA banner — only shown to logged-out visitors */}
+      {!isLoggedIn && (
+        <section className="publicCtaBanner">
+          <div className="publicCtaBannerInner">
+            <h2>{copy.ctaTitle}</h2>
+            <p>{copy.ctaSub}</p>
+            <Link href="/register" className="button publicHeroCtaPrimary">{copy.ctaBtn}</Link>
+          </div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="publicFooter">
@@ -253,7 +271,9 @@ export function SplashLanding({ latestPosts, locale: initialLocale }: Props) {
             <Link href="/blog">{copy.blog}</Link>
             <Link href="/resources">{copy.resources}</Link>
             <Link href="/support">{copy.support}</Link>
-            <Link href="/login">{copy.signIn}</Link>
+            {isLoggedIn
+              ? <Link href="/dashboard">{copy.dashboard}</Link>
+              : <Link href="/login">{copy.signIn}</Link>}
           </nav>
           <p className="publicFooterLegal">&copy; {new Date().getFullYear()} Akunta. {copy.legal}</p>
         </div>

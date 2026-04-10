@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
@@ -58,7 +58,6 @@ const copy = {
 
 export const AppNav = ({ locale }: { locale: Locale }) => {
   const pathname = usePathname() || "/";
-  const router = useRouter();
   const labels = copy[locale];
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -75,8 +74,7 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
+    window.location.href = "/";
   };
 
   const navLinks = (

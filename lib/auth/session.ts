@@ -3,7 +3,7 @@ import { promisify } from "util";
 
 import { prisma } from "@/lib/db";
 
-export { AUTH_COOKIE_NAME, AUTH_COOKIE_MAX_AGE_SECONDS } from "@/lib/auth/constants";
+export { AUTH_COOKIE_NAME, AUTH_COOKIE_MAX_AGE_SECONDS, AUTH_INDICATOR_COOKIE } from "@/lib/auth/constants";
 import { AUTH_COOKIE_MAX_AGE_SECONDS } from "@/lib/auth/constants";
 
 const scryptAsync = promisify(scrypt);

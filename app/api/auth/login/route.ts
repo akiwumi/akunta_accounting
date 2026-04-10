@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import {
   AUTH_COOKIE_MAX_AGE_SECONDS,
   AUTH_COOKIE_NAME,
+  AUTH_INDICATOR_COOKIE,
   createSession,
   findUserByEmail,
   getUserBusinessId,
@@ -64,13 +65,14 @@ export async function POST(request: Request) {
     const token = await createSession(user.id, businessId);
 
     const response = NextResponse.json({ ok: true, userId: user.id });
-    response.cookies.set(AUTH_COOKIE_NAME, token, {
-      httpOnly: true,
-      sameSite: "lax",
+    const cookieOpts = {
+      sameSite: "lax" as const,
       secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: AUTH_COOKIE_MAX_AGE_SECONDS
-    });
+    };
+    response.cookies.set(AUTH_COOKIE_NAME, token, { ...cookieOpts, httpOnly: true });
+    response.cookies.set(AUTH_INDICATOR_COOKIE, "1", { ...cookieOpts, httpOnly: false });
 
     return response;
   } catch (error) {
