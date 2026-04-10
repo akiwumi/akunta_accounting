@@ -38,37 +38,17 @@ export const metadata: Metadata = {
   }
 };
 
-// Routes that render inside the authenticated app shell (AppNav + PageSubNav)
-const APP_SHELL_PREFIXES = [
-  "/dashboard",
-  "/receipts",
-  "/invoices",
-  "/transactions",
-  "/ledger",
-  "/reports",
-  "/imports",
-  "/assets",
-  "/mileage",
-  "/periodiseringsfond",
-  "/salaries",
-  "/compliance",
-  "/review",
-  "/settings",
-  "/audit"
-];
-
-function isAppShellRoute(pathname: string): boolean {
-  return APP_SHELL_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+// Auth entry pages — always get the plain auth layout regardless of session
+function isAuthRoute(pathname: string): boolean {
+  return (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/sign-in")
   );
 }
 
-// Routes that never get the app shell, even when the user is authenticated
-const PUBLIC_PREFIXES = ["/", "/login", "/register", "/sign-in", "/welcome", "/blog", "/help", "/support", "/resources", "/pricing"];
-
-function isAuthRoute(pathname: string): boolean {
-  return pathname.startsWith("/login") || pathname.startsWith("/register") || pathname.startsWith("/sign-in");
-}
+// Public marketing / info pages — never show the app shell
+const PUBLIC_PREFIXES = ["/", "/welcome", "/blog", "/help", "/support", "/resources", "/pricing"];
 
 function isPublicPage(pathname: string): boolean {
   if (pathname === "/") return true;
@@ -79,15 +59,20 @@ function isPublicPage(pathname: string): boolean {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const locale = getRequestLocale();
-  const pathname = headers().get("x-pathname") ?? "/";
+  // pathname may be "" if the x-pathname middleware header wasn't forwarded;
+  // treat unknown as neither auth nor public so the cookie decides.
+  const pathname = headers().get("x-pathname") ?? "";
   const hasSession = Boolean(cookies().get(AUTH_COOKIE_NAME)?.value);
 
   const authRoute = isAuthRoute(pathname);
-  // Show app shell for known app routes. The session cookie acts as a fallback
-  // for cases where the x-pathname header is not forwarded (e.g. certain Vercel
-  // edge runs), but only for non-public, non-auth routes.
-  const appShell = !authRoute && !isPublicPage(pathname) &&
-    (isAppShellRoute(pathname) || hasSession);
+  // knownPublicPage is only true when we positively identify the route as public.
+  // An empty/unknown pathname does NOT count as public.
+  const knownPublicPage = pathname !== "" && isPublicPage(pathname);
+
+  // Show app shell whenever the user has a valid session and is not on an
+  // auth page or a known public page. The session cookie is the source of
+  // truth — this survives missing x-pathname headers and hard redirects.
+  const appShell = hasSession && !authRoute && !knownPublicPage;
 
   return (
     <html lang={locale} className={`${manrope.variable} ${notoSerif.variable} ${inter.variable}`}>

@@ -45,7 +45,10 @@ export default function LoginPage() {
         return;
       }
       setIsLeaving(true);
-      setTimeout(() => { router.replace("/dashboard"); router.refresh(); }, 340);
+      // Hard redirect so the root layout gets a fresh server render with the
+      // session cookie present — client-side router.replace() does not re-run
+      // shared Server Component layouts, which would leave the sidebar missing.
+      setTimeout(() => { window.location.href = "/dashboard"; }, 340);
     } catch {
       setError("Unable to connect. Please try again.");
       setIsSubmitting(false);
