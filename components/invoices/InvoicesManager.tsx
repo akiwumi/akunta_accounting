@@ -470,7 +470,8 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          invoiceNumber: effectiveInvoiceNumber.trim() || undefined,
+          // Untouched means "use the pattern": let the server assign it and advance the sequence.
+          invoiceNumber: invoiceNumberTouched ? invoiceNumber.trim() || undefined : undefined,
           projectName: projectName.trim() || undefined,
           description: description.trim() || undefined,
           notes: notes.trim() || undefined,
