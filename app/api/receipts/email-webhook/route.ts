@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     buffer: fileBuffer
   });
 
-  let grossAmount = extracted.grossAmount !== undefined ? round2(asNumber(extracted.grossAmount)) : undefined;
+  const grossAmount = extracted.grossAmount !== undefined ? round2(asNumber(extracted.grossAmount)) : undefined;
   const receiptDate = extracted.issueDate ?? extracted.receiptDate;
   const vatRateDefault = business.taxConfig ? asNumber(business.taxConfig.vatStandardRate as unknown as number | string) : 0.25;
   const vatAmountFromExtract = extracted.vatAmount !== undefined ? round2(asNumber(extracted.vatAmount)) : undefined;

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { type Locale } from "@/lib/i18n/locale";
 
@@ -75,19 +75,18 @@ export const ReceiptsTable = ({ locale, rows, copy }: ReceiptsTableProps) => {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingSelected, setDeletingSelected] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [rawSelectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    setSelectedIds((previous) => {
-      const next = new Set<string>();
-      for (const receipt of rows) {
-        if (previous.has(receipt.id)) next.add(receipt.id);
-      }
-      return next;
-    });
-  }, [rows]);
+  // Only count selections that still exist in the current rows.
+  const selectedIds = useMemo(() => {
+    const next = new Set<string>();
+    for (const receipt of rows) {
+      if (rawSelectedIds.has(receipt.id)) next.add(receipt.id);
+    }
+    return next;
+  }, [rawSelectedIds, rows]);
 
   useEffect(() => {
     if (!selectAllRef.current) return;

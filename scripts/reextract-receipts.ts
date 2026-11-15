@@ -51,7 +51,7 @@ const run = async () => {
       const vatRateDefault = receipt.business.taxConfig
         ? asNumber(receipt.business.taxConfig.vatStandardRate as unknown as number | string)
         : 0.25;
-      let grossAmount = extracted.grossAmount !== undefined ? round2(asNumber(extracted.grossAmount)) : null;
+      const grossAmount = extracted.grossAmount !== undefined ? round2(asNumber(extracted.grossAmount)) : null;
       let vatAmount = extracted.vatAmount !== undefined ? round2(asNumber(extracted.vatAmount)) : null;
       let netAmount = extracted.netAmount !== undefined ? round2(asNumber(extracted.netAmount)) : null;
       let vatRate = extracted.vatRate !== undefined && extracted.vatRate !== null ? asNumber(extracted.vatRate) : null;

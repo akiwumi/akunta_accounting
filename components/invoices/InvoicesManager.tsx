@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { formatMoney } from "@/lib/data/format";
 import { computeInvoiceTotals, normalizeVatRate } from "@/lib/invoices/calculations";
@@ -348,11 +348,8 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
     });
   }, [defaults.invoiceNumberPattern, defaults.nextInvoiceSequence, issueDate]);
 
-  useEffect(() => {
-    if (!invoiceNumberTouched) {
-      setInvoiceNumber(suggestedInvoiceNumber);
-    }
-  }, [invoiceNumberTouched, suggestedInvoiceNumber]);
+  // Follow the pattern-suggested number until the user edits the field.
+  const effectiveInvoiceNumber = invoiceNumberTouched ? invoiceNumber : suggestedInvoiceNumber;
 
   const computed = useMemo(
     () =>
@@ -473,7 +470,7 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          invoiceNumber: invoiceNumber.trim() || undefined,
+          invoiceNumber: effectiveInvoiceNumber.trim() || undefined,
           projectName: projectName.trim() || undefined,
           description: description.trim() || undefined,
           notes: notes.trim() || undefined,
@@ -773,7 +770,7 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
                 <label className="stack">
                   {copy.invoiceNumber}
                   <input
-                    value={invoiceNumber}
+                    value={effectiveInvoiceNumber}
                     onChange={(event) => {
                       setInvoiceNumberTouched(true);
                       setInvoiceNumber(event.target.value);
@@ -1013,7 +1010,7 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
             <div className="invoicePaperHeader">
               <div>
                 <h3>Invoice</h3>
-                <p>#{invoiceNumber || "-"}</p>
+                <p>#{effectiveInvoiceNumber || "-"}</p>
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {logoDataUrl ? <img className="invoiceLogo" src={logoDataUrl} alt="Invoice logo" /> : null}

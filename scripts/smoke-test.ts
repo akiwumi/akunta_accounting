@@ -36,11 +36,11 @@ async function check(
     const result = await fn();
     results.push({ name, ...result });
     const icon = result.ok ? "✓" : "✗";
-    console.log(`  ${icon} ${name}${result.detail ? ` — ${result.detail}` : ""}`);
+    console.log(`  ${icon} ${name}${result.detail ? `: ${result.detail}` : ""}`);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     results.push({ name, ok: false, detail });
-    console.log(`  ✗ ${name} — THREW: ${detail}`);
+    console.log(`  ✗ ${name} THREW: ${detail}`);
   }
 }
 
@@ -71,7 +71,7 @@ function withSession(headers: Record<string, string> = {}): Record<string, strin
 // ─── Test run ─────────────────────────────────────────────────────────────────
 
 async function run() {
-  console.log(`\nAkunta Smoke Test — ${BASE_URL}\n`);
+  console.log(`\nAkunta Smoke Test: ${BASE_URL}\n`);
 
   // 1. Health
   await check("GET /api/health → 200", async () => {
@@ -210,7 +210,7 @@ async function run() {
 
   if (failed > 0) {
     console.log("\nFailed checks:");
-    results.filter((r) => !r.ok).forEach((r) => console.log(`  ✗ ${r.name}${r.detail ? ` — ${r.detail}` : ""}`));
+    results.filter((r) => !r.ok).forEach((r) => console.log(`  ✗ ${r.name}${r.detail ? `: ${r.detail}` : ""}`));
     process.exit(1);
   } else {
     console.log("All checks passed.\n");

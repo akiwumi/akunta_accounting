@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
 import { getRequestLocale } from "@/lib/i18n/locale";
 
 export default async function DashboardActivityPage() {
-  const locale = getRequestLocale();
+  const locale = await getRequestLocale();
   const sv = locale === "sv";
   const numberLocale = sv ? "sv-SE" : "en-GB";
 
@@ -92,9 +92,9 @@ export default async function DashboardActivityPage() {
             <tbody>
               {receipts.map((r) => (
                 <tr key={r.id}>
-                  <td>{r.receiptDate ? new Date(r.receiptDate).toLocaleDateString(numberLocale) : "—"}</td>
-                  <td>{r.vendor ?? "—"}</td>
-                  <td>{r.grossAmount != null ? formatMoney(Number(r.grossAmount), r.currency ?? "SEK", numberLocale) : "—"}</td>
+                  <td>{r.receiptDate ? new Date(r.receiptDate).toLocaleDateString(numberLocale) : "-"}</td>
+                  <td>{r.vendor ?? "-"}</td>
+                  <td>{r.grossAmount != null ? formatMoney(Number(r.grossAmount), r.currency ?? "SEK", numberLocale) : "-"}</td>
                 </tr>
               ))}
             </tbody>

@@ -11,7 +11,7 @@ import { prisma } from "@/lib/db";
 import { getRequestLocale } from "@/lib/i18n/locale";
 
 export default async function TransactionsPage() {
-  const locale = getRequestLocale();
+  const locale = await getRequestLocale();
   const copy =
     locale === "sv"
       ? {

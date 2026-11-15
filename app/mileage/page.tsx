@@ -7,7 +7,7 @@ import { getRequestLocale } from "@/lib/i18n/locale";
 import { asNumber } from "@/lib/accounting/math";
 
 export default async function MileagePage() {
-  const locale = getRequestLocale();
+  const locale = await getRequestLocale();
   const sv = locale === "sv";
   const currentYear = new Date().getFullYear();
 

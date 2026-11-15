@@ -8,14 +8,15 @@ import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 
 type WelcomePageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     confirm?: string | string[];
     confirmed?: string | string[];
     token?: string | string[];
-  };
+  }>;
 };
 
-export default async function WelcomePage({ searchParams }: WelcomePageProps) {
+export default async function WelcomePage(props: WelcomePageProps) {
+  const searchParams = await props.searchParams;
   let firstName = "there";
   let isAuthenticated = false;
   const awaitingSupabaseConfirmation = searchParams?.confirm === "1";

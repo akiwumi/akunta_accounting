@@ -50,7 +50,12 @@ const extractJson = (text: string): unknown => {
   return JSON.parse(text.slice(start, end + 1));
 };
 
-const getOutputText = (response: any): string => {
+type ModelResponse = {
+  output_text?: unknown;
+  output?: unknown;
+};
+
+const getOutputText = (response: ModelResponse): string => {
   if (typeof response.output_text === "string" && response.output_text.length > 0) {
     return response.output_text;
   }
@@ -58,7 +63,7 @@ const getOutputText = (response: any): string => {
   if (Array.isArray(response.output)) {
     const chunks: string[] = [];
     for (const outputItem of response.output) {
-      if (!Array.isArray(outputItem.content)) continue;
+      if (!Array.isArray(outputItem?.content)) continue;
       for (const content of outputItem.content) {
         if (typeof content?.text === "string") chunks.push(content.text);
       }

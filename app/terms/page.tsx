@@ -8,8 +8,8 @@ export const metadata = buildPageMetadata({
   path: "/terms"
 });
 
-export default function TermsPage() {
-  const locale = getRequestLocale();
+export default async function TermsPage() {
+  const locale = await getRequestLocale();
   const sv = locale === "sv";
   const updated = "10 April 2026";
 

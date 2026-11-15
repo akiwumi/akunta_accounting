@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
-  console.warn("[billing] STRIPE_SECRET_KEY is not set — billing features will be unavailable.");
+  console.warn("[billing] STRIPE_SECRET_KEY is not set, so billing features will be unavailable.");
 }
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "sk_test_placeholder", {

@@ -10,9 +10,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 const paySchema = z.object({
@@ -25,7 +25,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: PAYROLL_PRISMA_NOT_READY }, { status: 503 });
   }
 
-  const salaryEntryId = context.params.id;
+  const salaryEntryId = (await context.params).id;
   if (!salaryEntryId) {
     return NextResponse.json({ error: "Missing salary entry id." }, { status: 400 });
   }

@@ -11,12 +11,12 @@ import { prisma } from "@/lib/db";
 import { getRequestLocale } from "@/lib/i18n/locale";
 
 type LedgerPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     year?: string;
     from?: string;
     to?: string;
     source?: string;
-  };
+  }>;
 };
 
 const parseDate = (value: string | undefined, endOfDay = false) => {
@@ -27,8 +27,9 @@ const parseDate = (value: string | undefined, endOfDay = false) => {
   return parsed;
 };
 
-export default async function LedgerPage({ searchParams }: LedgerPageProps) {
-  const locale = getRequestLocale();
+export default async function LedgerPage(props: LedgerPageProps) {
+  const searchParams = await props.searchParams;
+  const locale = await getRequestLocale();
   const copy =
     locale === "sv"
       ? {
@@ -150,7 +151,8 @@ export default async function LedgerPage({ searchParams }: LedgerPageProps) {
     },
     include: {
       receipt: {
-        select: receiptSelect as any
+        // itemPurchased is only selected when the column exists; the mapping below handles it missing.
+        select: receiptSelect as { id: true; vendor: true; originalFileName: true; itemPurchased: true }
       },
       paidInvoice: {
         select: {
@@ -175,7 +177,7 @@ export default async function LedgerPage({ searchParams }: LedgerPageProps) {
     orderBy: { source: "asc" }
   });
 
-  const ledgerRows = (transactions as any[]).map((txn) => ({
+  const ledgerRows = transactions.map((txn) => ({
     id: txn.id,
     txnDate: txn.txnDate.toISOString(),
     itemPurchased: (() => {
@@ -213,7 +215,7 @@ export default async function LedgerPage({ searchParams }: LedgerPageProps) {
     source: txn.source,
     reference: txn.reference ?? null,
     journal: txn.lines
-      .map((line: any) => {
+      .map((line) => {
         const debit = asNumber(line.debit);
         const credit = asNumber(line.credit);
         const amount = debit > 0 ? `D ${debit.toFixed(2)}` : `C ${credit.toFixed(2)}`;

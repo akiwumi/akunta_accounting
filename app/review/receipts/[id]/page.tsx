@@ -11,13 +11,14 @@ import { prisma } from "@/lib/db";
 import { getRequestLocale } from "@/lib/i18n/locale";
 
 type ReceiptReviewPageProps = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
-export default async function ReceiptReviewPage({ params }: ReceiptReviewPageProps) {
-  const locale = getRequestLocale();
+export default async function ReceiptReviewPage(props: ReceiptReviewPageProps) {
+  const params = await props.params;
+  const locale = await getRequestLocale();
   const copy =
     locale === "sv"
       ? {

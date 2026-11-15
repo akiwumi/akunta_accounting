@@ -7,9 +7,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 export async function POST(_request: Request, context: RouteContext) {
@@ -17,7 +17,7 @@ export async function POST(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: PAYROLL_PRISMA_NOT_READY }, { status: 503 });
   }
 
-  const expenseId = context.params.id;
+  const expenseId = (await context.params).id;
   if (!expenseId) {
     return NextResponse.json({ error: "Missing expense id." }, { status: 400 });
   }

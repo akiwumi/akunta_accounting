@@ -14,9 +14,9 @@ export const runtime = "nodejs";
 const round4 = (value: number) => Math.round(value * 10000) / 10000;
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 const patchSchema = z.object({
@@ -104,7 +104,7 @@ const createLines = (params: {
 };
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const receiptId = context.params.id;
+  const receiptId = (await context.params).id;
   if (!receiptId) {
     return NextResponse.json({ error: "Missing receipt id." }, { status: 400 });
   }
@@ -242,8 +242,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   const effectiveReceiptCurrency = submittedCurrency ?? normalizeCurrency(existing.currency ?? "SEK");
   const fxDateInput = parsedReceiptDate ?? existing.receiptDate ?? new Date();
 
-  let receiptCurrency = effectiveReceiptCurrency;
-  let receiptSourceCurrency: string | null = effectiveReceiptCurrency === "SEK" ? null : effectiveReceiptCurrency;
+  const receiptCurrency = effectiveReceiptCurrency;
+  const receiptSourceCurrency: string | null = effectiveReceiptCurrency === "SEK" ? null : effectiveReceiptCurrency;
   let receiptFxRateToSek = existing.fxRateToSek !== null ? asNumber(existing.fxRateToSek) : null;
   let receiptFxRateDate = existing.fxRateDate ?? null;
 
@@ -529,7 +529,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  const receiptId = context.params.id;
+  const receiptId = (await context.params).id;
   if (!receiptId) {
     return NextResponse.json({ error: "Missing receipt id." }, { status: 400 });
   }

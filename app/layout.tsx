@@ -46,9 +46,9 @@ export const metadata: Metadata = {
   }
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
-  const locale = getRequestLocale();
-  const hasSession = Boolean(cookies().get(AUTH_COOKIE_NAME)?.value);
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const locale = await getRequestLocale();
+  const hasSession = Boolean((await cookies()).get(AUTH_COOKIE_NAME)?.value);
 
   return (
     <html lang={locale} className={`${manrope.variable} ${notoSerif.variable} ${inter.variable}`}>

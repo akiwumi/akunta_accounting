@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { type Locale } from "@/lib/i18n/locale";
 
@@ -97,26 +97,22 @@ export const ReceiptEditForm = ({ receiptId, locale, initial }: ReceiptEditFormP
   const [receiptDate, setReceiptDate] = useState(initial.receiptDate);
   const [category, setCategory] = useState(initial.category);
   const [grossAmount, setGrossAmount] = useState(initial.grossAmount);
-  const [netAmount, setNetAmount] = useState(initial.netAmount);
-  const [vatAmount, setVatAmount] = useState(initial.vatAmount);
   const [currency, setCurrency] = useState(initial.currency || "SEK");
   const [vatRate, setVatRate] = useState(initial.vatRate);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Net and VAT are always derived from gross and VAT rate.
+  const { netAmount, vatAmount } = useMemo(() => {
     const gross = Number(grossAmount.replace(",", "."));
     const rate = Number(vatRate.replace(",", "."));
     if (!Number.isFinite(gross) || gross <= 0 || !Number.isFinite(rate) || rate < 0) {
-      setNetAmount("");
-      setVatAmount("");
-      return;
+      return { netAmount: "", vatAmount: "" };
     }
     const net = Math.round((gross / (1 + rate)) * 100) / 100;
     const vat = Math.round((gross - net) * 100) / 100;
-    setNetAmount(net.toFixed(2));
-    setVatAmount(vat.toFixed(2));
+    return { netAmount: net.toFixed(2), vatAmount: vat.toFixed(2) };
   }, [grossAmount, vatRate]);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {

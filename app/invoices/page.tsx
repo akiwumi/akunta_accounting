@@ -9,15 +9,16 @@ import { prisma } from "@/lib/db";
 import { getRequestLocale } from "@/lib/i18n/locale";
 
 type InvoicesPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     year?: string;
     month?: string;
     q?: string;
-  };
+  }>;
 };
 
-export default async function InvoicesPage({ searchParams }: InvoicesPageProps) {
-  const locale = getRequestLocale();
+export default async function InvoicesPage(props: InvoicesPageProps) {
+  const searchParams = await props.searchParams;
+  const locale = await getRequestLocale();
   const copy =
     locale === "sv"
       ? {

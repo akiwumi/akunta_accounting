@@ -16,13 +16,14 @@ const partialPaySchema = z.object({
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { businessId } = await requireAuthContext();
 
     const body = await request.json().catch(() => ({}));
     const parsed = partialPaySchema.safeParse(body);
-    if (!parsed.success) return NextResponse.json({ error: parsed.error.errors[0]?.message }, { status: 422 });
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 422 });
 
     const { paymentDate, amount, reference, notes } = parsed.data;
     const txnDate = new Date(`${paymentDate}T00:00:00.000Z`);
@@ -49,7 +50,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const transaction = await createTransaction({
       businessId,
       txnDate,
-      description: `Partial payment — Invoice ${invoice.invoiceNumber}`,
+      description: `Partial payment on invoice ${invoice.invoiceNumber}`,
       direction: TransactionDirections.INCOME,
       grossAmount: round2(amount),
       netAmount: paymentNet,

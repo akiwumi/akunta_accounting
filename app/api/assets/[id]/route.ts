@@ -17,7 +17,8 @@ const updateSchema = z.object({
   notes: z.string().max(500).optional()
 });
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { businessId } = await requireAuthContext();
   const body = await request.json();
   const payload = updateSchema.parse(body);
@@ -46,7 +47,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   return NextResponse.json(updated);
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { businessId } = await requireAuthContext();
   const existing = await prisma.fixedAsset.findFirst({
     where: { id: params.id, businessId }

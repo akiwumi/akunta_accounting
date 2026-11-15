@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const parsed = supportSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.errors[0]?.message ?? "Validation error." },
+      { error: parsed.error.issues[0]?.message ?? "Validation error." },
       { status: 422 }
     );
   }

@@ -48,14 +48,14 @@ export function parseAcceptLanguage(acceptLanguage: string | null): Locale | nul
  *  2. Accept-Language header (browser/OS preference — first visit)
  *  3. DEFAULT_LOCALE ("en")
  */
-export const getRequestLocale = (): Locale => {
+export const getRequestLocale = async (): Promise<Locale> => {
   // 1. Cookie
-  const cookieLocale = cookies().get("locale")?.value;
+  const cookieLocale = (await cookies()).get("locale")?.value;
   if (isLocale(cookieLocale)) return cookieLocale;
 
   // 2. Accept-Language header
   try {
-    const acceptLanguage = headers().get("accept-language");
+    const acceptLanguage = (await headers()).get("accept-language");
     const detected = parseAcceptLanguage(acceptLanguage);
     if (detected) return detected;
   } catch {

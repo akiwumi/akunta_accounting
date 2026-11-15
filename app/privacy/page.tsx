@@ -8,8 +8,8 @@ export const metadata = buildPageMetadata({
   path: "/privacy"
 });
 
-export default function PrivacyPage() {
-  const locale = getRequestLocale();
+export default async function PrivacyPage() {
+  const locale = await getRequestLocale();
   const sv = locale === "sv";
   const updated = "10 April 2026";
 
@@ -141,7 +141,7 @@ export default function PrivacyPage() {
         <section>
           <h2>3. Why do we process your data?</h2>
           <ul>
-            <li><strong>Contract performance (Art. 6.1.b GDPR):</strong> To provide the bookkeeping service — store your data, generate reports and invoices</li>
+            <li><strong>Contract performance (Art. 6.1.b GDPR):</strong> To provide the bookkeeping service, which means storing your data and generating reports and invoices</li>
             <li><strong>Legal obligation (Art. 6.1.c GDPR):</strong> Swedish tax law (Skatteverket) and the Bookkeeping Act require us to handle accounting records correctly</li>
             <li><strong>Legitimate interest (Art. 6.1.f GDPR):</strong> Error logging to maintain service stability; anonymous performance measurements</li>
           </ul>
@@ -174,7 +174,7 @@ export default function PrivacyPage() {
             <li>Request erasure (&quot;right to be forgotten&quot;), subject to legal retention requirements</li>
             <li>Request restriction of processing</li>
             <li>Object to processing based on legitimate interest</li>
-            <li>Data portability — export your data in machine-readable format</li>
+            <li>Data portability: export your data in a machine-readable format</li>
           </ul>
           <p>
             Send requests to <a href="mailto:support@akunta.se">support@akunta.se</a>.
@@ -187,10 +187,10 @@ export default function PrivacyPage() {
           <h2>7. Cookies and tracking</h2>
           <p>We use the following cookies:</p>
           <ul>
-            <li><strong>akunta_session</strong> — essential login token (httpOnly, 30 days)</li>
-            <li><strong>akunta_auth</strong> — login UI indicator (30 days)</li>
-            <li><strong>locale</strong> — language preference (1 year)</li>
-            <li><strong>cookie_consent</strong> — your cookie consent choice (1 year)</li>
+            <li><strong>akunta_session</strong>: essential login token (httpOnly, 30 days)</li>
+            <li><strong>akunta_auth</strong>: login UI indicator (30 days)</li>
+            <li><strong>locale</strong>: language preference (1 year)</li>
+            <li><strong>cookie_consent</strong>: your cookie consent choice (1 year)</li>
           </ul>
           <p>
             With your consent, we enable Sentry (error monitoring) and Vercel Analytics (cookieless,

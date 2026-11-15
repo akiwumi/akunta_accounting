@@ -15,13 +15,14 @@ const creditNoteSchema = z.object({
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { businessId } = await requireAuthContext();
 
     const body = await request.json().catch(() => ({}));
     const parsed = creditNoteSchema.safeParse(body);
-    if (!parsed.success) return NextResponse.json({ error: parsed.error.errors[0]?.message }, { status: 422 });
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 422 });
 
     const { issueDate, amount, reason } = parsed.data;
     const txnDate = new Date(`${issueDate}T00:00:00.000Z`);
@@ -45,7 +46,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const transaction = await createTransaction({
       businessId,
       txnDate,
-      description: `Credit note ${creditNoteNumber} — Invoice ${invoice.invoiceNumber}`,
+      description: `Credit note ${creditNoteNumber} for invoice ${invoice.invoiceNumber}`,
       direction: TransactionDirections.EXPENSE,
       grossAmount: round2(amount),
       netAmount,
@@ -77,7 +78,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { businessId } = await requireAuthContext();
     const creditNotes = await prisma.creditNote.findMany({

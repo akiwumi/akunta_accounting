@@ -58,7 +58,7 @@ export async function runOcrJob(job: OcrJobPayload): Promise<void> {
     ? asNumber(business.taxConfig.vatStandardRate as unknown as number | string)
     : 0.25;
 
-  let grossAmount =
+  const grossAmount =
     extracted.grossAmount !== undefined ? round2(asNumber(extracted.grossAmount)) : undefined;
   const vatAmountFromExtract =
     extracted.vatAmount !== undefined ? round2(asNumber(extracted.vatAmount)) : undefined;

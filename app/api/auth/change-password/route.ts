@@ -84,7 +84,7 @@ export async function POST(request: Request) {
 
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.errors[0]?.message ?? "Validation error." }, { status: 422 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Validation error." }, { status: 422 });
   }
 
   const { currentPassword, newPassword } = parsed.data;

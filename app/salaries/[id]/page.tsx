@@ -9,14 +9,15 @@ import { PAYROLL_PRISMA_NOT_READY, isPayrollPrismaReady, prisma } from "@/lib/db
 import { getRequestLocale } from "@/lib/i18n/locale";
 
 type SalaryEmployeePageProps = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
-export default async function SalaryEmployeePage({ params }: SalaryEmployeePageProps) {
+export default async function SalaryEmployeePage(props: SalaryEmployeePageProps) {
+  const params = await props.params;
   const employeeId = params.id;
-  const locale = getRequestLocale();
+  const locale = await getRequestLocale();
   const sv = locale === "sv";
 
   if (!employeeId) {

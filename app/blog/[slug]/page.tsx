@@ -5,13 +5,14 @@ import type { Metadata } from "next";
 import { getBlogPost, blogPosts } from "@/lib/content/blog";
 import { buildPageMetadata } from "@/lib/seo";
 
-type Props = { params: { slug: string } };
+type Props = { params: Promise<{ slug: string }> };
 
 export function generateStaticParams() {
   return blogPosts.map((p) => ({ slug: p.slug }));
 }
 
-export function generateMetadata({ params }: Props): Metadata {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const post = getBlogPost(params.slug);
   if (!post) {
     return buildPageMetadata({
@@ -34,7 +35,8 @@ export function generateMetadata({ params }: Props): Metadata {
   });
 }
 
-export default function BlogArticlePage({ params }: Props) {
+export default async function BlogArticlePage(props: Props) {
+  const params = await props.params;
   const post = getBlogPost(params.slug);
   if (!post) notFound();
 

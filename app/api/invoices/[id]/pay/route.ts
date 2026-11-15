@@ -16,8 +16,8 @@ export const dynamic = "force-dynamic";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
-export async function POST(request: Request, context: { params: { id: string } }) {
-  const invoiceId = context.params.id;
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  const invoiceId = (await context.params).id;
   if (!invoiceId) return NextResponse.json({ error: "Missing invoice id." }, { status: 400 });
 
   try {

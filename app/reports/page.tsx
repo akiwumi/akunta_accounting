@@ -7,13 +7,14 @@ import { getClosedTaxYearsForBusiness, getLatestClosedTaxYear } from "@/lib/data
 import { getRequestLocale } from "@/lib/i18n/locale";
 
 type ReportsPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     year?: string;
-  };
+  }>;
 };
 
-export default async function ReportsPage({ searchParams }: ReportsPageProps) {
-  const locale = getRequestLocale();
+export default async function ReportsPage(props: ReportsPageProps) {
+  const searchParams = await props.searchParams;
+  const locale = await getRequestLocale();
   const copy =
     locale === "sv"
       ? {

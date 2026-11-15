@@ -5,9 +5,9 @@ import { loadInvoiceForOutput } from "@/lib/invoices/load";
 import { buildInvoicePdf } from "@/lib/invoices/pdf";
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 export const runtime = "nodejs";
@@ -20,7 +20,7 @@ const sanitizeFileNamePart = (value: string) =>
     .replace(/^-+|-+$/g, "") || "invoice";
 
 export async function GET(_request: Request, context: RouteContext) {
-  const invoiceId = context.params.id;
+  const invoiceId = (await context.params).id;
   if (!invoiceId) {
     return NextResponse.json({ error: "Missing invoice id." }, { status: 400 });
   }

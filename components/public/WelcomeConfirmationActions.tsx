@@ -25,6 +25,8 @@ export function WelcomeConfirmationActions({
 
   useEffect(() => {
     if (isAuthenticated && !token && !awaitingSupabaseConfirmation) {
+      // Resets state when the auth props change after the first render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(null);
       setStatus("confirmed");
       return;

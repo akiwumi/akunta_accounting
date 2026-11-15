@@ -53,7 +53,7 @@ const withPathHeader = (request: NextRequest, response?: NextResponse) => {
   return NextResponse.next({ request: { headers: requestHeaders } });
 };
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Session token presence check only — full DB validation happens in route handlers.

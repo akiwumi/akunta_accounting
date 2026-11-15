@@ -13,10 +13,10 @@ export const metadata = buildPageMetadata({
   path: "/"
 });
 
-export default function LandingPage() {
+export default async function LandingPage() {
   const latestPosts = getLatestBlogPosts(4);
-  const locale = getRequestLocale();
-  const isLoggedIn = Boolean(cookies().get(AUTH_COOKIE_NAME)?.value);
+  const locale = await getRequestLocale();
+  const isLoggedIn = Boolean((await cookies()).get(AUTH_COOKIE_NAME)?.value);
 
   return (
     <>

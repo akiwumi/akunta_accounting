@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = draftSchema.safeParse(body);
-    if (!parsed.success) return NextResponse.json({ error: parsed.error.errors[0]?.message }, { status: 422 });
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 422 });
 
     const { year, month } = parsed.data;
 

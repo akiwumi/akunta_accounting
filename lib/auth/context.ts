@@ -11,7 +11,7 @@ export type AuthContext = {
 
 // Used by all route handlers and server components.
 export const getAuthContext = async (): Promise<AuthContext | null> => {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
   if (!token) return null;
 

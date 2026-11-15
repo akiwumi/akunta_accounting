@@ -70,12 +70,13 @@ function actionBadgeClass(action: string): string {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default async function AuditPage({
-  searchParams,
-}: {
-  searchParams?: { page?: string; type?: string };
-}) {
-  const locale = getRequestLocale();
+export default async function AuditPage(
+  props: {
+    searchParams?: Promise<{ page?: string; type?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const locale = await getRequestLocale();
   const sv = locale === "sv";
 
   const business = await ensureBusiness();
@@ -115,7 +116,7 @@ export default async function AuditPage({
       <p className="subtitle">
         {sv
           ? "Alla ändringar som gjorts i ditt konto, med vem och när."
-          : "Every change made in your account — who did it and when."}
+          : "Every change in your account, who made it and when."}
       </p>
 
       {/* Filter bar */}
@@ -206,7 +207,7 @@ export default async function AuditPage({
                           )}
                         </ul>
                       ) : (
-                        <span className="auditNoChange">—</span>
+                        <span className="auditNoChange">-</span>
                       )}
                     </td>
                   </tr>

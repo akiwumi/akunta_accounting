@@ -22,6 +22,8 @@ export function CookieConsentBanner() {
   const [consent, setConsent] = useState<"all" | "essential" | null | undefined>(undefined);
 
   useEffect(() => {
+    // The cookie is only readable in the browser, so read it after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setConsent(getStoredConsent());
   }, []);
 

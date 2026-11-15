@@ -224,7 +224,7 @@ export async function handleRegisterRequest(request: Request) {
 
   const parsed = registerSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.errors[0]?.message ?? "Validation error." }, { status: 422 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Validation error." }, { status: 422 });
   }
 
   const { email, password, fullName, businessName } = parsed.data;

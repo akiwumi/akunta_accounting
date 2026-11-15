@@ -20,7 +20,7 @@ You can upload:
 
 Akunta will extract the vendor name, date, gross amount, VAT amount, and currency using OCR. High-contrast images give the best results.
 
-After upload, the receipt appears in the Review queue if confidence is below 80% — check the extracted fields and correct any errors before approving.
+After upload, the receipt appears in the Review queue if confidence is below 80%. Check the extracted fields and correct any errors before approving.
 
 **Tips for good OCR results**
 - Photograph receipts on a flat, dark background.
@@ -58,12 +58,12 @@ After import, open **Reconciliation** to match bank lines against existing trans
 
 Choose your reporting period (quarter or full year) and click **Generate**. Akunta calculates:
 
-- **Box 05** — Taxable sales at 25%
-- **Box 06** — Taxable sales at 12%
-- **Box 07** — Taxable sales at 6%
-- **Box 10** — Output VAT total
-- **Box 20** — Input VAT (deductible purchases)
-- **Box 49** — VAT payable or refundable
+- **Box 05**: Taxable sales at 25%
+- **Box 06**: Taxable sales at 12%
+- **Box 07**: Taxable sales at 6%
+- **Box 10**: Output VAT total
+- **Box 20**: Input VAT (deductible purchases)
+- **Box 49**: VAT payable or refundable
 
 You can export the report as a PDF or submit it directly to Skatteverket from the **Compliance** page when the integration is enabled.
 
@@ -124,11 +124,11 @@ At month end, go to **Compliance → Payroll declarations** to review the arbets
     body: `Go to the **Dashboard** and click **Export full accounts (Excel)**, or go to **Reports** and use the **Excel export** button.
 
 The exported workbook contains separate sheets for:
-- **P&L** — profit and loss by account
-- **Balance sheet** — assets, liabilities, and equity
-- **VAT summary** — input and output VAT by period
-- **Ledger** — all journal lines in date order
-- **Transactions** — all transactions with receipt/invoice references
+- **P&L**: profit and loss by account
+- **Balance sheet**: assets, liabilities, and equity
+- **VAT summary**: input and output VAT by period
+- **Ledger**: all journal lines in date order
+- **Transactions**: all transactions with receipt/invoice references
 
 Select the tax year from the dropdown before exporting to scope the data correctly.
 

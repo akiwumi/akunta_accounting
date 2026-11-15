@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
   if (!token) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 

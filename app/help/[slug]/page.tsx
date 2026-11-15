@@ -5,13 +5,14 @@ import type { Metadata } from "next";
 import { getHelpArticle, helpArticles } from "@/lib/content/help";
 import { buildPageMetadata } from "@/lib/seo";
 
-type Props = { params: { slug: string } };
+type Props = { params: Promise<{ slug: string }> };
 
 export function generateStaticParams() {
   return helpArticles.map((a) => ({ slug: a.slug }));
 }
 
-export function generateMetadata({ params }: Props): Metadata {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const article = getHelpArticle(params.slug);
   if (!article) {
     return buildPageMetadata({
@@ -32,7 +33,8 @@ export function generateMetadata({ params }: Props): Metadata {
   });
 }
 
-export default function HelpArticlePage({ params }: Props) {
+export default async function HelpArticlePage(props: Props) {
+  const params = await props.params;
   const article = getHelpArticle(params.slug);
   if (!article) notFound();
 

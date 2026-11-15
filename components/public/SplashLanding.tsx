@@ -17,7 +17,7 @@ const FEATURES_EN = [
   { icon: "RC", title: "Receipt capture", description: "Upload or forward receipts by email. OCR extracts vendor, amount, VAT, and date automatically." },
   { icon: "IV", title: "Invoicing", description: "Create, send, and track invoices with automatic VAT calculation and PDF generation." },
   { icon: "BC", title: "Bank import", description: "Import your bank CSV and Akunta posts every row to the correct BAS account instantly." },
-  { icon: "RP", title: "Reports & exports", description: "P&L, balance sheet, VAT summary, and NE-bilaga draft — all exportable to Excel." },
+  { icon: "RP", title: "Reports & exports", description: "P&L, balance sheet, VAT summary and NE-bilaga draft, all exportable to Excel." },
   { icon: "CK", title: "Swedish compliance", description: "Momsdeklaration, arbetsgivardeklaration, and period locks built for Skatteverket requirements." },
   { icon: "SL", title: "Payroll", description: "Calculate gross-to-net salary, employer contributions, and generate payslips for your employees." }
 ];
@@ -26,7 +26,7 @@ const FEATURES_SV = [
   { icon: "RC", title: "Kvittohantering", description: "Ladda upp eller vidarebefordra kvitton via e-post. OCR extraherar leverantör, belopp, moms och datum." },
   { icon: "IV", title: "Fakturering", description: "Skapa, skicka och följ upp fakturor med automatisk momsberäkning och PDF-generering." },
   { icon: "BC", title: "Bankimport", description: "Importera din bank-CSV och Akunta bokför varje rad på rätt BAS-konto direkt." },
-  { icon: "RP", title: "Rapporter & export", description: "Resultaträkning, balansräkning, momssammanfattning och NE-bilaga — exporterbara till Excel." },
+  { icon: "RP", title: "Rapporter & export", description: "Resultaträkning, balansräkning, momssammanfattning och NE-bilaga, alla exporterbara till Excel." },
   { icon: "CK", title: "Svensk compliance", description: "Momsdeklaration, arbetsgivardeklaration och periodlås byggt för Skatteverkets krav." },
   { icon: "SL", title: "Löneadministration", description: "Beräkna brutto-till-netto lön, arbetsgivaravgifter och generera lönebesked." }
 ];
@@ -45,6 +45,8 @@ export function SplashLanding({ latestPosts, locale: initialLocale, isLoggedIn =
 
   useEffect(() => {
     const cookie = document.cookie.split(";").find((c) => c.trim().startsWith("locale="));
+    // The cookie is only readable in the browser, so read it after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (cookie) setLocale(cookie.split("=")[1]?.trim() ?? initialLocale);
   }, [initialLocale]);
 
@@ -56,6 +58,8 @@ export function SplashLanding({ latestPosts, locale: initialLocale, isLoggedIn =
   useEffect(() => {
     // Skip splash if already seen this session (e.g. after a language change reload)
     if (sessionStorage.getItem("akunta_splash_shown")) {
+      // sessionStorage is browser-only, so this has to run after hydration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhase("landing");
       return;
     }
@@ -74,7 +78,7 @@ export function SplashLanding({ latestPosts, locale: initialLocale, isLoggedIn =
   const copy = sv
     ? {
         subtitle: "Bokföring & redovisning",
-        heroTitle: "Bokföring för svenska egenföretagare — utan krångel.",
+        heroTitle: "Bokföring för svenska egenföretagare utan krångel.",
         heroSub: "Akunta hanterar kvitton, fakturor, bankimport, moms och löner på ett ställe. Svenska regler inbyggda.",
         startFree: "Kom igång gratis",
         signIn: "Logga in",
@@ -96,7 +100,7 @@ export function SplashLanding({ latestPosts, locale: initialLocale, isLoggedIn =
       }
     : {
         subtitle: "Bookkeeping Accounting",
-        heroTitle: "Bookkeeping for Swedish sole traders — without the pain.",
+        heroTitle: "Bookkeeping for Swedish sole traders without the pain.",
         heroSub: "Akunta handles receipts, invoices, bank imports, VAT, and payroll in one place. Swedish rules built in. No accountant required for day-to-day books.",
         startFree: "Start free",
         signIn: "Sign in",

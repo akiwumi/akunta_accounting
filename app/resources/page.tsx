@@ -45,7 +45,7 @@ export default function ResourcesPage() {
       <div className="publicContent">
         <h1>Resources</h1>
         <p className="publicLead">
-          Useful links for Swedish sole traders — tax authorities, registration portals, and accounting standards.
+          Useful links for Swedish sole traders: tax authorities, registration portals and accounting standards.
         </p>
 
         {categories

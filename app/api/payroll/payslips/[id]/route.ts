@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 // GET /api/payroll/payslips/[id] — return payslip data (JSON) or PDF file
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { businessId } = await requireAuthContext();
     const { searchParams } = new URL(request.url);

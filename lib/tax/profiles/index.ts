@@ -187,8 +187,8 @@ const NL: CountryProfileTemplate = {
   vatPaymentDueDays: 30,
   incomeTaxMode: "progressive",
   incomeTaxBands: progressive([
-    [0, 37149, 0.3697, "Box 1 — lower"],
-    [37149, null, 0.495, "Box 1 — upper"]
+    [0, 37149, 0.3697, "Box 1 (lower)"],
+    [37149, null, 0.495, "Box 1 (upper)"]
   ]),
   socialContributionRate: 0.2765,
   pensionContributionRate: 0.0865,

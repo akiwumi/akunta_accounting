@@ -64,7 +64,7 @@ export const LedgerTransactionsTable = ({ locale, rows, copy }: LedgerTransactio
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingSelected, setDeletingSelected] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [rawSelectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const numberLocale = locale === "sv" ? "sv-SE" : "en-GB";
@@ -93,15 +93,14 @@ export const LedgerTransactionsTable = ({ locale, rows, copy }: LedgerTransactio
     [rows]
   );
 
-  useEffect(() => {
-    setSelectedIds((previous) => {
-      const next = new Set<string>();
-      for (const row of rows) {
-        if (previous.has(row.id)) next.add(row.id);
-      }
-      return next;
-    });
-  }, [rows]);
+  // Only count selections that still exist in the current rows.
+  const selectedIds = useMemo(() => {
+    const next = new Set<string>();
+    for (const row of rows) {
+      if (rawSelectedIds.has(row.id)) next.add(row.id);
+    }
+    return next;
+  }, [rawSelectedIds, rows]);
 
   useEffect(() => {
     if (!selectAllRef.current) return;

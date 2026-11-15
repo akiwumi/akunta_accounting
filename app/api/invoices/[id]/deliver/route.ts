@@ -31,7 +31,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type RouteContext = { params: { id: string } };
+type RouteContext = { params: Promise<{ id: string }> };
 
 const deliverSchema = z.discriminatedUnion("method", [
   z.object({
@@ -46,7 +46,8 @@ const deliverSchema = z.discriminatedUnion("method", [
   }),
 ]);
 
-export async function POST(request: Request, { params }: RouteContext) {
+export async function POST(request: Request, props: RouteContext) {
+  const params = await props.params;
   const { businessId } = await requireAuthContext();
   const { id } = params;
 
@@ -70,7 +71,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   const parsed = deliverSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.errors[0]?.message ?? "Validation error." },
+      { error: parsed.error.issues[0]?.message ?? "Validation error." },
       { status: 422 }
     );
   }

@@ -8,7 +8,7 @@ import { PAYROLL_PRISMA_NOT_READY, isPayrollPrismaReady, prisma } from "@/lib/db
 import { getRequestLocale } from "@/lib/i18n/locale";
 
 export default async function SalariesPage() {
-  const locale = getRequestLocale();
+  const locale = await getRequestLocale();
   const sv = locale === "sv";
   const copy = {
     title: sv ? "Löner och personal" : "Salaries and Employees",

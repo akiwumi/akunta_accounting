@@ -1,4 +1,4 @@
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 /** @type {import('next').NextConfig} */
 const distDir = process.env.NEXT_DIST_DIR?.trim();
@@ -88,5 +88,6 @@ export default withSentryConfig(nextConfig, {
   silent: !process.env.CI,
 
   // Automatically instrument React components for better error context
-  reactComponentAnnotation: { enabled: true }
+  // (webpack builds only; Turbopack, the Next 16 default, doesn't support it)
+  webpack: { reactComponentAnnotation: { enabled: true } }
 });

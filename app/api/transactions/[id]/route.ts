@@ -8,9 +8,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 const patchSchema = z
@@ -24,7 +24,7 @@ const patchSchema = z
   });
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const transactionId = context.params.id;
+  const transactionId = (await context.params).id;
   if (!transactionId) {
     return NextResponse.json({ error: "Missing transaction id." }, { status: 400 });
   }
@@ -74,7 +74,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  const transactionId = context.params.id;
+  const transactionId = (await context.params).id;
   if (!transactionId) {
     return NextResponse.json({ error: "Missing transaction id." }, { status: 400 });
   }

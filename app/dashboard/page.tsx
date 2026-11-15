@@ -12,13 +12,14 @@ import { prisma } from "@/lib/db";
 import { getRequestLocale } from "@/lib/i18n/locale";
 
 type DashboardPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     year?: string;
-  };
+  }>;
 };
 
-export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const locale = getRequestLocale();
+export default async function DashboardPage(props: DashboardPageProps) {
+  const searchParams = await props.searchParams;
+  const locale = await getRequestLocale();
   const copy =
     locale === "sv"
       ? {

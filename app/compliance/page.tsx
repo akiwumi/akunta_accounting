@@ -55,7 +55,7 @@ function filingStatusLabel(status: string, sv: boolean): string {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function CompliancePage() {
-  const locale = getRequestLocale();
+  const locale = await getRequestLocale();
   const sv = locale === "sv";
   const now = new Date();
   const taxYear = now.getFullYear() - 1;

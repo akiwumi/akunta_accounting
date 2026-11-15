@@ -7,7 +7,7 @@ import { getRequestLocale } from "@/lib/i18n/locale";
 import { asNumber, round2 } from "@/lib/accounting/math";
 
 export default async function PeriodiseringsfondPage() {
-  const locale = getRequestLocale();
+  const locale = await getRequestLocale();
   const sv = locale === "sv";
 
   const copy = {

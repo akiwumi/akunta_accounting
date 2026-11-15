@@ -7,7 +7,8 @@ import type { DeclarationPayload } from "@/lib/payroll/declarations";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+export async function POST(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { businessId } = await requireAuthContext();
 
