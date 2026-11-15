@@ -12,14 +12,14 @@ type TaxEstimate = {
   totalEstimatedTax: number;
   notes: string[];
 };
-type NeDraft = Awaited<ReturnType<typeof import("./reports").buildNeBilagaDraft>>;
+type NeRows = import("@/lib/tax/neRows").NeRow[];
 
 export const buildAccountingWorkbook = (data: {
   profitAndLoss: ProfitLossReport;
   balanceSheet: BalanceSheetReport;
   vat: VatReport;
   taxEstimate: TaxEstimate;
-  neDraft: NeDraft;
+  neRows: NeRows;
 }) => {
   const workbook = XLSX.utils.book_new();
 
@@ -78,22 +78,8 @@ export const buildAccountingWorkbook = (data: {
   ];
 
   const neRows = [
-    ["Section", "NE Line", "Amount"],
-    ...Object.entries(data.neDraft.incomeLines).map(([key, value]) => ["Income", key, value]),
-    ...Object.entries(data.neDraft.expenseLines).map(([key, value]) => ["Expense", key, value]),
-    ["Totals", "totalIncome", data.neDraft.totalIncome],
-    ["Totals", "totalExpenses", data.neDraft.totalExpenses],
-    ["Result", "R47_overskottUnderskott", data.neDraft.R47_overskottUnderskott],
-    ["Result", "R48_skattemassigResultat", data.neDraft.R48_skattemassigResultat],
-    ["Adjustment", "perisFond_withdrawal", data.neDraft.taxAdjustments.perisFond_withdrawal],
-    ["Adjustment", "perisFond_allocation", data.neDraft.taxAdjustments.perisFond_allocation],
-    ["Adjustment", "expFond_withdrawal", data.neDraft.taxAdjustments.expFond_withdrawal],
-    ["Adjustment", "expFond_allocation", data.neDraft.taxAdjustments.expFond_allocation],
-    ["Supplementary", "fixedAssetCount", data.neDraft.supplementary.fixedAssetCount],
-    ["Supplementary", "mileageDeduction", data.neDraft.supplementary.mileageDeduction],
-    [],
-    ["Notes", ""],
-    ...data.neDraft.notes.map((note) => [note, ""])
+    ["Section", "NE box", "Amount"],
+    ...data.neRows.map((row) => [row.Section, row.Line, row.Amount])
   ];
 
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(pnlRows), "ProfitLoss");

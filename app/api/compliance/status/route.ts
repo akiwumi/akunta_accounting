@@ -64,7 +64,7 @@ export async function GET() {
       where: { businessId, status: "UNPAID" },
     }),
     prisma.receipt.count({
-      where: { businessId, needsReview: true },
+      where: { businessId, deletedAt: null, needsReview: true },
     }),
   ]);
 

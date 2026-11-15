@@ -146,7 +146,9 @@ export async function runOcrJob(job: OcrJobPayload): Promise<void> {
   });
 
   // ── Post transaction ────────────────────────────────────────────────────────
-  if (postingGrossAmount !== undefined && postingGrossAmount > 0) {
+  // A booked entry cannot be altered, so a receipt the extractor is unsure of is
+  // not booked here. It is booked when the user approves it (PATCH /api/receipts/[id]).
+  if (!extracted.needsReview && postingGrossAmount !== undefined && postingGrossAmount > 0) {
     // Only create a transaction if one doesn't exist for this receipt yet
     const existing = await prisma.transaction.findFirst({
       where: { receiptId },

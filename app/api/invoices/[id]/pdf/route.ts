@@ -1,83 +1,26 @@
 import { NextResponse } from "next/server";
 
-import { requireAuthContext } from "@/lib/auth/context";
-import { loadInvoiceForOutput } from "@/lib/invoices/load";
-import { buildInvoicePdf } from "@/lib/invoices/pdf";
+import { authOrNull, jsonError, unauthorized } from "@/lib/invoices/http";
+import { invoicePdfFileName, loadInvoiceForOutput, renderInvoicePdf } from "@/lib/invoices/load";
 
-type RouteContext = {
-  params: Promise<{
-    id: string;
-  }>;
-};
+type RouteContext = { params: Promise<{ id: string }> };
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const sanitizeFileNamePart = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9-_]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "invoice";
+export async function GET(request: Request, context: RouteContext) {
+  const auth = await authOrNull();
+  if (!auth) return unauthorized();
 
-export async function GET(_request: Request, context: RouteContext) {
-  const invoiceId = (await context.params).id;
-  if (!invoiceId) {
-    return NextResponse.json({ error: "Missing invoice id." }, { status: 400 });
-  }
+  const invoice = await loadInvoiceForOutput({ businessId: auth.businessId, invoiceId: (await context.params).id });
+  if (!invoice) return jsonError("Invoice not found.", 404);
 
-  const { businessId } = await requireAuthContext();
-  const invoice = await loadInvoiceForOutput({
-    businessId,
-    invoiceId
-  });
-
-  if (!invoice) {
-    return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
-  }
-
-  const buffer = buildInvoicePdf({
-    invoiceNumber: invoice.invoiceNumber,
-    projectName: invoice.projectName,
-    issueDate: invoice.issueDate,
-    dueDate: invoice.dueDate,
-    currency: invoice.currency,
-    sender: {
-      name: invoice.senderName,
-      address: invoice.senderAddress,
-      registration: invoice.senderOrgNumber,
-      email: invoice.senderEmail,
-      phone: invoice.senderPhone,
-      website: invoice.senderWebsite
-    },
-    customer: {
-      name: invoice.customerName,
-      address: invoice.customerAddress,
-      email: invoice.customerEmail,
-      phone: invoice.customerPhone,
-      website: invoice.customerWebsite
-    },
-    items: invoice.items.map((item) => ({
-      description: item.description,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      vatAmount: item.vatAmount,
-      totalAmount: item.totalAmount
-    })),
-    subtotalAmount: invoice.subtotalAmount,
-    vatAmount: invoice.vatAmount,
-    grossAmount: invoice.grossAmount,
-    notes: invoice.notes,
-    paymentMethod: invoice.paymentMethod,
-    paymentDetails: invoice.paymentDetails
-  });
-
-  const filename = `invoice-${sanitizeFileNamePart(invoice.invoiceNumber)}.pdf`;
-
-  return new NextResponse(new Uint8Array(buffer), {
+  const inline = new URL(request.url).searchParams.get("view") === "1";
+  return new NextResponse(new Uint8Array(renderInvoicePdf(invoice)), {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${invoicePdfFileName(invoice)}"`,
       "Cache-Control": "no-store"
     }
   });

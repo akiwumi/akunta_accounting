@@ -64,8 +64,9 @@ const supabaseStore = async (buffer: Buffer, originalName: string, mimeType: str
   const key = `${Date.now()}-${randomUUID()}-${sanitizeName(originalName)}`;
   const { error } = await supabase.storage.from(bucket).upload(key, buffer, { contentType: mimeType });
   if (error) throw new Error(`Supabase storage upload failed: ${error.message}`);
-  const { data } = supabase.storage.from(bucket).getPublicUrl(key);
-  return { key, originalName, mimeType, size: buffer.length, url: data.publicUrl };
+  // The bucket must be private. Receipts are personal financial records, so no
+  // public URL is ever produced: files are read back server-side by key.
+  return { key, originalName, mimeType, size: buffer.length, url: key };
 };
 
 const supabaseRead = async (key: string): Promise<Buffer> => {

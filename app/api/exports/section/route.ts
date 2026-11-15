@@ -1,3 +1,4 @@
+import { buildNeRows } from "@/lib/tax/neRows";
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 
@@ -7,7 +8,6 @@ import { buildSimplePdf } from "@/lib/accounting/pdf";
 import {
   buildBalanceSheet,
   buildDashboardSummary,
-  buildNeBilagaDraft,
   buildProfitAndLoss,
   buildVatReport
 } from "@/lib/accounting/reports";
@@ -127,7 +127,7 @@ const buildDashboardExport = async (params: URLSearchParams): Promise<ExportResu
     }),
     prisma.receipt.count({
       where: {
-        businessId,
+        businessId, deletedAt: null,
         OR: [
           {
             receiptDate: {
@@ -191,7 +191,7 @@ const buildReceiptsExport = async (params: URLSearchParams): Promise<ExportResul
 
   const receipts = await prisma.receipt.findMany({
     where: {
-      businessId,
+      businessId, deletedAt: null,
       AND: [
         {
           OR: [
@@ -834,12 +834,12 @@ const buildReviewExport = async (): Promise<ExportResult> => {
   const business = await requireBusiness(businessId);
   const [needsReviewReceipts, recentReceipts, otherInputs] = await Promise.all([
     prisma.receipt.findMany({
-      where: { businessId, needsReview: true },
+      where: { businessId, deletedAt: null, needsReview: true },
       orderBy: { createdAt: "desc" },
       take: 1000
     }),
     prisma.receipt.findMany({
-      where: { businessId },
+      where: { businessId, deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 1000
     }),
@@ -891,11 +891,11 @@ const buildReportsExport = async (params: URLSearchParams): Promise<ExportResult
   const business = await requireBusiness(businessId);
   const period = resolveReportPeriod(params, getFiscalYearStartMonth(business.fiscalYearStart));
 
-  const [profitAndLoss, balanceSheet, vat, neDraft] = await Promise.all([
+  const [profitAndLoss, balanceSheet, vat, neRows] = await Promise.all([
     buildProfitAndLoss({ businessId, ...period }),
     buildBalanceSheet({ businessId, ...period }),
     buildVatReport({ businessId, ...period }),
-    buildNeBilagaDraft({ businessId, ...period })
+    buildNeRows(businessId, period.to)
   ]);
 
   if (!business.taxConfig) {
@@ -915,7 +915,7 @@ const buildReportsExport = async (params: URLSearchParams): Promise<ExportResult
     balanceSheet,
     vat,
     taxEstimate,
-    neDraft
+    neRows
   });
 
   return {
@@ -965,53 +965,8 @@ const buildReportsExport = async (params: URLSearchParams): Promise<ExportResult
         ]
       },
       {
-        name: "NE Draft",
-        rows: [
-          ...Object.entries(neDraft.incomeLines).map(([line, amount]) => ({
-            Section: "Income",
-            Line: line,
-            Amount: amount
-          })),
-          ...Object.entries(neDraft.expenseLines).map(([line, amount]) => ({
-            Section: "Expense",
-            Line: line,
-            Amount: amount
-          })),
-          { Section: "Totals", Line: "totalIncome", Amount: neDraft.totalIncome },
-          { Section: "Totals", Line: "totalExpenses", Amount: neDraft.totalExpenses },
-          { Section: "Result", Line: "R47_overskottUnderskott", Amount: neDraft.R47_overskottUnderskott },
-          { Section: "Result", Line: "R48_skattemassigResultat", Amount: neDraft.R48_skattemassigResultat },
-          {
-            Section: "Adjustment",
-            Line: "perisFond_withdrawal",
-            Amount: neDraft.taxAdjustments.perisFond_withdrawal
-          },
-          {
-            Section: "Adjustment",
-            Line: "perisFond_allocation",
-            Amount: neDraft.taxAdjustments.perisFond_allocation
-          },
-          {
-            Section: "Adjustment",
-            Line: "expFond_withdrawal",
-            Amount: neDraft.taxAdjustments.expFond_withdrawal
-          },
-          {
-            Section: "Adjustment",
-            Line: "expFond_allocation",
-            Amount: neDraft.taxAdjustments.expFond_allocation
-          },
-          {
-            Section: "Supplementary",
-            Line: "fixedAssetCount",
-            Amount: neDraft.supplementary.fixedAssetCount
-          },
-          {
-            Section: "Supplementary",
-            Line: "mileageDeduction",
-            Amount: neDraft.supplementary.mileageDeduction
-          }
-        ]
+        name: "NE-bilaga",
+        rows: neRows
       }
     ]
   };

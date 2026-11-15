@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { requireAuthContext } from "@/lib/auth/context";
 import { lockPeriod, getLockedPeriods } from "@/lib/accounting/period-locks";
+import { writeLedgerAudit } from "@/lib/accounting/ledger";
+import { prisma } from "@/lib/db";
 
 const lockSchema = z.object({
   periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -34,6 +36,14 @@ export async function POST(request: Request) {
     if (end < start) return NextResponse.json({ error: "periodEnd must be after periodStart." }, { status: 422 });
 
     const lock = await lockPeriod(businessId, start, end, userId);
+    await writeLedgerAudit(prisma, {
+      businessId,
+      userId,
+      entityType: "PeriodLock",
+      entityId: lock.id,
+      action: "LOCK",
+      after: { periodStart: start, periodEnd: end }
+    });
     return NextResponse.json(lock, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Error" }, { status: 500 });

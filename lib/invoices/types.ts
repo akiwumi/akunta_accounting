@@ -12,6 +12,12 @@ export type InvoiceItemInput = {
   unitPrice: number;
   vatMode: InvoiceVatMode;
   vatRate: number;
+  /** ROT/RUT invoices only: this line is qualifying labour. */
+  rotRutLabour?: boolean;
+  /** On a labour line the type of work; on a material line the type of work it belongs to; empty for other costs. */
+  rotRutWorkType?: string | null;
+  /** Hours worked, on a labour line. */
+  rotRutHours?: number | null;
 };
 
 export type InvoiceItemComputed = {

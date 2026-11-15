@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const { businessId } = await requireAuthContext();
+    const { businessId, role } = await requireAuthContext();
     const business = await requireBusiness(businessId);
     const orgNumber = business.personnummer ?? business.vatNumber ?? business.skvActorId;
     if (!orgNumber) return NextResponse.json({ error: "No organisation number configured. Add it in Settings." }, { status: 422 });
@@ -17,7 +17,8 @@ export async function GET() {
     const result = await fetchBeskattningsengagemang(orgNumber);
 
     // Persist the SKV actor ID if we found a result
-    if (result.found && result.data) {
+    // A GET must not change anything for someone with read-only access.
+    if (result.found && result.data && role !== "viewer") {
       await prisma.business.update({
         where: { id: businessId },
         data: { skvActorId: result.data.organisationsnummer, skvAuthorizationStatus: "ACTIVE" }

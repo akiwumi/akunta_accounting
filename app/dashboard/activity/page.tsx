@@ -52,7 +52,7 @@ export default async function DashboardActivityPage() {
 
   const [receipts, invoices, transactions] = await Promise.all([
     prisma.receipt.findMany({
-      where: { businessId: business.id },
+      where: { businessId: business.id, deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 5
     }),

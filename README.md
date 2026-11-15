@@ -19,7 +19,7 @@ Sweden-first accounting web app for sole traders (`enskild firma`) with:
 ## Stack
 
 - Next.js (App Router) + TypeScript
-- Prisma + SQLite (local first)
+- Prisma + PostgreSQL (Supabase in production, any Postgres locally)
 - XLSX export
 - Optional OpenAI-powered receipt extraction
 
@@ -41,7 +41,7 @@ cp .env.example .env
 
 ```bash
 npm run prisma:generate
-npm run db:push
+npm run db:migrate
 npm run db:seed
 ```
 
@@ -132,6 +132,6 @@ Add local-country rules per jurisdiction without changing receipt/import/report 
 
 ## Cloud + Local
 
-- Local: SQLite (`DATABASE_URL=file:./dev.db`)
-- Cloud: move Prisma datasource to PostgreSQL (EU-hosted), keep the same API/UI surface
+- Local: any PostgreSQL database, schema applied with `npm run db:migrate`
+- Cloud: Supabase PostgreSQL (EU-hosted). See `.env.example` for the pooled and direct connection strings
 # business_accounting

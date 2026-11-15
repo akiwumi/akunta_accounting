@@ -20,9 +20,8 @@ import { z } from "zod";
 
 import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
-import { createSmtpTransport, getDefaultEmailFromAddress, getSmtpConfig } from "@/lib/email/smtp";
+import { sendInvoiceEmail } from "@/lib/invoices/delivery";
 import { loadInvoiceForOutput } from "@/lib/invoices/load";
-import { buildInvoicePdf } from "@/lib/invoices/pdf";
 import {
   generatePeppolInvoice,
   buildPeppolInputFromInvoice,
@@ -85,73 +84,13 @@ export async function POST(request: Request, props: RouteContext) {
       return NextResponse.json({ error: "Invoice data could not be loaded." }, { status: 404 });
     }
 
-    const pdfBuffer = buildInvoicePdf({
-      invoiceNumber: invoiceData.invoiceNumber,
-      projectName: invoiceData.projectName,
-      issueDate: invoiceData.issueDate,
-      dueDate: invoiceData.dueDate,
-      currency: invoiceData.currency,
-      sender: {
-        name: invoiceData.senderName,
-        address: invoiceData.senderAddress,
-        registration: invoiceData.senderOrgNumber,
-        email: invoiceData.senderEmail,
-        phone: invoiceData.senderPhone,
-        website: invoiceData.senderWebsite,
-      },
-      customer: {
-        name: invoiceData.customerName,
-        address: invoiceData.customerAddress,
-        email: invoiceData.customerEmail,
-        phone: invoiceData.customerPhone,
-        website: invoiceData.customerWebsite,
-      },
-      items: invoiceData.items.map((item) => ({
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        vatAmount: item.vatAmount,
-        totalAmount: item.totalAmount,
-      })),
-      subtotalAmount: invoiceData.subtotalAmount,
-      vatAmount: invoiceData.vatAmount,
-      grossAmount: invoiceData.grossAmount,
-      notes: invoiceData.notes,
-      paymentMethod: invoiceData.paymentMethod,
-      paymentDetails: invoiceData.paymentDetails,
-    });
-    const sanitize = (v: string) =>
-      v.toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/^-+|-+$/g, "") || "invoice";
-
-    const pdfFilename = `invoice-${sanitize(invoice.invoiceNumber)}.pdf`;
-    const subject =
-      data.subject ?? `Invoice ${invoice.invoiceNumber} from ${invoice.senderName ?? business.name}`;
-    const html = data.message
-      ? `<p>${data.message.replace(/\n/g, "<br>")}</p>`
-      : `<p>Please find your invoice ${invoice.invoiceNumber} attached.</p>`;
-
-    const from = getDefaultEmailFromAddress(business.invoiceEmailFrom ?? undefined);
-
-    const smtp = getSmtpConfig();
-    if (!smtp.ok) {
+    const result = await sendInvoiceEmail(invoiceData, { to: data.to, subject: data.subject, message: data.message });
+    if (!result.ok) {
       return NextResponse.json(
-        { error: "Email delivery is not configured. Set SMTP credentials." },
-        { status: 503 }
+        { error: result.message },
+        { status: result.reason === "not_configured" ? 503 : 502 }
       );
     }
-    const transporter = createSmtpTransport(smtp.config);
-    await transporter.sendMail({
-      from,
-      to: data.to,
-      subject,
-      html,
-      attachments: [{ filename: pdfFilename, content: pdfBuffer }]
-    });
-
-    await prisma.invoice.update({
-      where: { id },
-      data: { sentAt: new Date(), emailTo: data.to },
-    });
 
     return NextResponse.json({ ok: true, method: "email", to: data.to });
   }

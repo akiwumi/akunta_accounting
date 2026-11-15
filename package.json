@@ -12,12 +12,14 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
-    "db:push": "prisma db push || npm run db:init",
-    "db:init": "[ -f prisma/dev.db ] || (prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/init.sql && sqlite3 prisma/dev.db < prisma/init.sql)",
+    "db:push": "echo \"db push is disabled: the schema is versioned. Use npm run db:migrate:dev (local) or npm run db:migrate (deploy).\" && exit 1",
     "db:seed": "tsx prisma/seed.ts",
     "db:backfill-receipt-transactions": "tsx scripts/backfill-receipt-transactions.ts",
     "db:reextract-receipts": "tsx scripts/reextract-receipts.ts",
-    "db:migrate-swedish-tax": "tsx scripts/migrate-swedish-tax.ts"
+    "db:migrate-swedish-tax": "tsx scripts/migrate-swedish-tax.ts",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "test": "bash scripts/test.sh"
   },
   "dependencies": {
     "@prisma/client": "^5.19.1",

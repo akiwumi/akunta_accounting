@@ -1,3 +1,4 @@
+import { buildNeRows } from "@/lib/tax/neRows";
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 
@@ -5,7 +6,6 @@ import { asNumber, round2 } from "@/lib/accounting/math";
 import {
   buildBalanceSheet,
   buildDashboardSummary,
-  buildNeBilagaDraft,
   buildProfitAndLoss,
   buildVatReport
 } from "@/lib/accounting/reports";
@@ -152,7 +152,7 @@ export async function GET(request: Request) {
     buildProfitAndLoss({ businessId, ...period }),
     buildBalanceSheet({ businessId, ...period }),
     buildVatReport({ businessId, ...period }),
-    buildNeBilagaDraft({ businessId, ...period }),
+    buildNeRows(businessId, period.to),
     prisma.account.findMany({
       where: { businessId },
       orderBy: { code: "asc" }
@@ -200,7 +200,7 @@ export async function GET(request: Request) {
         })
       : Promise.resolve([]),
     prisma.receipt.findMany({
-      where: { businessId },
+      where: { businessId, deletedAt: null },
       include: { transactions: { select: { id: true } } },
       orderBy: [{ receiptDate: "desc" }, { createdAt: "desc" }],
       take: 20000
@@ -429,43 +429,7 @@ export async function GET(request: Request) {
     },
     {
       name: "SelectedYear_NE_Draft",
-      rows: [
-        ...Object.entries(neDraft.incomeLines).map(([line, amount]) => ({
-          Section: "Income",
-          Line: line,
-          Amount: amount
-        })),
-        ...Object.entries(neDraft.expenseLines).map(([line, amount]) => ({
-          Section: "Expense",
-          Line: line,
-          Amount: amount
-        })),
-        { Section: "Totals", Line: "totalIncome", Amount: neDraft.totalIncome },
-        { Section: "Totals", Line: "totalExpenses", Amount: neDraft.totalExpenses },
-        { Section: "Result", Line: "R47_overskottUnderskott", Amount: neDraft.R47_overskottUnderskott },
-        { Section: "Result", Line: "R48_skattemassigResultat", Amount: neDraft.R48_skattemassigResultat },
-        {
-          Section: "Adjustment",
-          Line: "perisFond_withdrawal",
-          Amount: neDraft.taxAdjustments.perisFond_withdrawal
-        },
-        {
-          Section: "Adjustment",
-          Line: "perisFond_allocation",
-          Amount: neDraft.taxAdjustments.perisFond_allocation
-        },
-        {
-          Section: "Adjustment",
-          Line: "expFond_withdrawal",
-          Amount: neDraft.taxAdjustments.expFond_withdrawal
-        },
-        {
-          Section: "Adjustment",
-          Line: "expFond_allocation",
-          Amount: neDraft.taxAdjustments.expFond_allocation
-        },
-        ...neDraft.notes.map((note) => ({ Section: "Note", Line: "", Amount: note }))
-      ]
+      rows: neDraft
     },
     {
       name: "Ledger_Totals",

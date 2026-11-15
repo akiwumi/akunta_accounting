@@ -98,14 +98,14 @@ export default async function CompliancePage() {
     }),
     prisma.bankStatementLine.count({ where: { businessId: business.id, status: "UNMATCHED" } }),
     prisma.invoice.count({ where: { businessId: business.id, status: "UNPAID" } }),
-    prisma.receipt.count({ where: { businessId: business.id, needsReview: true } }),
+    prisma.receipt.count({ where: { businessId: business.id, deletedAt: null, needsReview: true } }),
     prisma.transaction.count({
       where: {
         businessId: business.id,
         txnDate: { gte: new Date(`${taxYear}-01-01`), lte: new Date(`${taxYear}-12-31`) },
       },
     }),
-    prisma.receipt.count({ where: { businessId: business.id } }),
+    prisma.receipt.count({ where: { businessId: business.id, deletedAt: null } }),
     prisma.invoice.count({ where: { businessId: business.id } }),
     prisma.fixedAsset.count({ where: { businessId: business.id } }).catch(() => 0),
     prisma.mileageEntry
@@ -237,8 +237,8 @@ export default async function CompliancePage() {
       category: sv ? "Avdrag" : "Deductions",
       label: sv ? "Körjournal (milersättning)" : "Mileage log",
       detail: sv
-        ? `${mileageCount} resor loggade för ${taxYear}. Schablonersättning: 1,85 kr/km.`
-        : `${mileageCount} trips logged for ${taxYear}. Standard rate: SEK 1.85/km.`,
+        ? `${mileageCount} resor loggade för ${taxYear}. Schablonersättning: 2,50 kr/km.`
+        : `${mileageCount} trips logged for ${taxYear}. Standard rate: SEK 2.50/km.`,
       status: mileageCount > 0 ? "ok" : "info",
     },
     {

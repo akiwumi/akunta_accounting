@@ -18,6 +18,9 @@ export default async function TransactionsPage() {
           title: "Transaktionsjournal",
           subtitle: "Dubbla bokföringsposter skapade från kvitton och bankimporter.",
           addPayment: "Lägg till betalning in",
+          verification: "Ver.nr",
+          cancelled: "Makulerad",
+          correction: "Rättelse",
           date: "Datum",
           description: "Beskrivning",
           direction: "Riktning",
@@ -32,6 +35,9 @@ export default async function TransactionsPage() {
           title: "Transactions Ledger",
           subtitle: "Double-entry postings generated from receipts and bank imports.",
           addPayment: "Add Payment Received",
+          verification: "Ver. no.",
+          cancelled: "Cancelled",
+          correction: "Correction",
           date: "Date",
           description: "Description",
           direction: "Direction",
@@ -54,9 +60,7 @@ export default async function TransactionsPage() {
         }
       }
     },
-    orderBy: {
-      txnDate: "desc"
-    },
+    orderBy: [{ txnDate: "desc" }, { verificationNumber: "desc" }],
     take: 50
   });
 
@@ -76,6 +80,7 @@ export default async function TransactionsPage() {
           <table>
             <thead>
               <tr>
+                <th>{copy.verification}</th>
                 <th>{copy.date}</th>
                 <th>{copy.description}</th>
                 <th>{copy.direction}</th>
@@ -89,8 +94,17 @@ export default async function TransactionsPage() {
             <tbody>
               {transactions.map((txn) => (
                 <tr key={txn.id}>
+                  <td>{txn.verificationNumber}</td>
                   <td>{new Date(txn.txnDate).toISOString().slice(0, 10)}</td>
-                  <td>{txn.description}</td>
+                  <td>
+                    {txn.description}
+                    {(txn.voidedAt || txn.reversesTransactionId) && (
+                      <>
+                        {" "}
+                        <span className="badge warn">{txn.voidedAt ? copy.cancelled : copy.correction}</span>
+                      </>
+                    )}
+                  </td>
                   <td>{txn.direction}</td>
                   <td>{formatMoney(asNumber(txn.grossAmount as unknown as number | string), txn.currency, numberLocale)}</td>
                   <td>{formatMoney(asNumber(txn.vatAmount as unknown as number | string), txn.currency, numberLocale)}</td>
@@ -116,7 +130,7 @@ export default async function TransactionsPage() {
               ))}
               {transactions.length === 0 && (
                 <tr>
-                  <td colSpan={8}>{copy.none}</td>
+                  <td colSpan={9}>{copy.none}</td>
                 </tr>
               )}
             </tbody>

@@ -31,12 +31,9 @@ const FEATURES_SV = [
   { icon: "SL", title: "Löneadministration", description: "Beräkna brutto-till-netto lön, arbetsgivaravgifter och generera lönebesked." }
 ];
 
-const TESTIMONIALS = [
-  { quote: "I went from spending a weekend on quarterly VAT to about 20 minutes. The bank import alone is worth it.", author: "Sara L.", role: "Freelance designer, Stockholm" },
-  { quote: "Finally a bookkeeping tool that understands Swedish sole trader rules without trying to be everything to everyone.", author: "Marcus H.", role: "IT consultant, Gothenburg" },
-  { quote: "My accountant now receives a clean Excel export every year. She stopped asking me to fix things.", author: "Annika W.", role: "Copywriter, Malmö" },
-  { quote: "Switching from a spreadsheet felt scary. Akunta made it obvious. I was up and running in an afternoon.", author: "Petra M.", role: "Therapist, Linköping" }
-];
+// Real customer quotes only, each used with the customer's permission. The
+// section stays hidden while this list is empty.
+const TESTIMONIALS: { quote: string; author: string; role: string }[] = [];
 
 export function SplashLanding({ latestPosts, locale: initialLocale, isLoggedIn = false }: Props) {
   const [phase, setPhase] = useState<"splash" | "fade" | "landing">("splash");
@@ -210,6 +207,7 @@ export function SplashLanding({ latestPosts, locale: initialLocale, isLoggedIn =
       </section>
 
       {/* Testimonials */}
+      {TESTIMONIALS.length > 0 && (
       <section className="publicSection publicSectionAlt" id="testimonials">
         <div className="publicSectionInner">
           <h2 className="publicSectionTitle">{copy.testimonialsTitle}</h2>
@@ -226,6 +224,7 @@ export function SplashLanding({ latestPosts, locale: initialLocale, isLoggedIn =
           </div>
         </div>
       </section>
+      )}
 
       {/* Blog */}
       <section className="publicSection" id="blog">

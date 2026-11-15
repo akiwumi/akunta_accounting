@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAuthContext } from "@/lib/auth/context";
+import { authErrorResponse, requireOwner } from "@/lib/auth/context";
 import { stripe } from "@/lib/billing/stripe";
 import { prisma } from "@/lib/db";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST() {
   try {
-    const { businessId } = await requireAuthContext();
+    const { businessId } = await requireOwner();
 
     const sub = await prisma.subscription.findFirst({ where: { businessId } });
     if (!sub?.stripeCustomerId) {
@@ -23,6 +23,9 @@ export async function POST() {
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
+    // Billing belongs to the owner: 401/403 instead of a generic 500.
+    const denied = authErrorResponse(error);
+    if (denied) return denied;
     return NextResponse.json({ error: error instanceof Error ? error.message : "Error" }, { status: 500 });
   }
 }

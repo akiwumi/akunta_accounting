@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import {
+  ACTIVE_TRANSACTION,
+  assertDateNotLocked,
+  ledgerErrorResponse,
+  voidTransaction,
+  writeLedgerAudit
+} from "@/lib/accounting/ledger";
 import { asNumber, round2 } from "@/lib/accounting/math";
 import { requireAuthContext } from "@/lib/auth/context";
 import { supportsReceiptItemPurchasedField } from "@/lib/data/receiptItemSupport";
@@ -109,25 +116,30 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing receipt id." }, { status: 400 });
   }
 
-  const { businessId } = await requireAuthContext();
+  const { businessId, userId } = await requireAuthContext();
   const rawPayload = patchSchema.parse(await request.json());
   const canUseItemPurchased = await supportsReceiptItemPurchasedField();
 
   const existing = await prisma.receipt.findUnique({
     where: { id: receiptId, businessId },
     include: {
+      // Only entries still in force. Cancelled entries and their corrections are history.
       transactions: {
+        where: ACTIVE_TRANSACTION,
         select: {
           id: true,
           direction: true,
           grossAmount: true,
           vatRate: true,
-          txnDate: true
+          txnDate: true,
+          description: true,
+          source: true,
+          reference: true
         }
       }
     }
   });
-  if (!existing) {
+  if (!existing || existing.deletedAt) {
     return NextResponse.json({ error: "Receipt not found." }, { status: 404 });
   }
 
@@ -280,7 +292,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
+  let updated;
+  try {
+    updated = await prisma.$transaction(async (tx) => {
     const receipt = await tx.receipt.update({
       where: { id: receiptId },
       data: {
@@ -396,26 +410,6 @@ export async function PATCH(request: Request, context: RouteContext) {
           throw new Error("Missing required account(s) for receipt rebooking.");
         }
 
-        await tx.transaction.update({
-          where: { id: transaction.id },
-          data: {
-            ...(parsedReceiptDate ? { txnDate: parsedReceiptDate } : {}),
-            ...(rawPayload.receiptNumber !== undefined ? { reference: rawPayload.receiptNumber?.trim() || null } : {}),
-            grossAmount: gross,
-            vatRate,
-            netAmount: net,
-            vatAmount: vat,
-            currency: "SEK",
-            sourceCurrency: postingSourceCurrency ?? null,
-            fxRateToSek: receiptFxRateToSek,
-            fxRateDate: receiptFxRateDate
-          }
-        });
-
-        await tx.journalLine.deleteMany({
-          where: { transactionId: transaction.id }
-        });
-
         const lines = createLines({
           direction,
           gross,
@@ -425,20 +419,90 @@ export async function PATCH(request: Request, context: RouteContext) {
           mainAccountId,
           vatAccountId
         });
+        const newDate = parsedReceiptDate ?? transaction.txnDate;
+        const newReference =
+          rawPayload.receiptNumber !== undefined ? rawPayload.receiptNumber?.trim() || null : transaction.reference;
+
+        // A booked entry is never rewritten. If the correction changes nothing
+        // in the books, leave the entry alone; otherwise cancel it with a
+        // reversing entry and book a new one.
+        const currentLines = await tx.journalLine.findMany({
+          where: { transactionId: transaction.id },
+          select: { accountId: true, debit: true, credit: true }
+        });
+        const signature = (rows: { accountId: string; debit: unknown; credit: unknown }[]) =>
+          rows
+            .map((row) => `${row.accountId}:${Number(row.debit).toFixed(2)}:${Number(row.credit).toFixed(2)}`)
+            .sort()
+            .join("|");
+        const booksUnchanged =
+          signature(currentLines) === signature(lines) && newDate.getTime() === transaction.txnDate.getTime();
+
+        if (booksUnchanged) {
+          if (shouldUpdateTransactionReference) {
+            await tx.transaction.update({ where: { id: transaction.id }, data: { reference: newReference } });
+          }
+          continue;
+        }
+
+        await voidTransaction(tx, {
+          businessId,
+          transactionId: transaction.id,
+          userId,
+          reason: "Receipt corrected"
+        });
+        await assertDateNotLocked(tx, businessId, newDate);
+
+        const replacement = await tx.transaction.create({
+          data: {
+            businessId,
+            receiptId,
+            txnDate: newDate,
+            description: transaction.description,
+            direction,
+            grossAmount: gross,
+            netAmount: net,
+            vatAmount: vat,
+            vatRate,
+            currency: "SEK",
+            sourceCurrency: postingSourceCurrency ?? undefined,
+            fxRateToSek: receiptFxRateToSek ?? undefined,
+            fxRateDate: receiptFxRateDate ?? undefined,
+            source: transaction.source,
+            reference: newReference
+          },
+          select: { id: true, verificationNumber: true }
+        });
 
         await tx.journalLine.createMany({
           data: lines.map((line) => ({
-            transactionId: transaction.id,
+            transactionId: replacement.id,
             accountId: line.accountId,
             debit: line.debit,
             credit: line.credit,
             note: line.note
           }))
         });
+
+        await writeLedgerAudit(tx, {
+          businessId,
+          userId,
+          entityType: "Transaction",
+          entityId: replacement.id,
+          action: "REBOOK",
+          before: { replacedTransactionId: transaction.id },
+          after: { verificationNumber: replacement.verificationNumber, txnDate: newDate, grossAmount: gross }
+        });
       }
     }
 
-    if (existing.transactions.length === 0) {
+    // Book the receipt once it has been reviewed. A receipt whose entry was
+    // cancelled is not silently booked again by an unrelated edit: that takes
+    // a deliberate approval (needsReview going from true to false).
+    const approvedNow = existing.needsReview && !receipt.needsReview;
+    const everBooked =
+      existing.transactions.length > 0 || (await tx.transaction.count({ where: { receiptId } })) > 0;
+    if (existing.transactions.length === 0 && !receipt.needsReview && (approvedNow || !everBooked)) {
       if (postingGrossAmount !== null && postingGrossAmount > 0) {
         const direction = TransactionDirections.EXPENSE;
         const vatRate = derivedVatRate ?? 0.25;
@@ -523,41 +587,73 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     return receipt;
-  });
+    });
+  } catch (error) {
+    const mapped = ledgerErrorResponse(error);
+    if (mapped) return NextResponse.json({ error: mapped.message }, { status: mapped.status });
+    throw error;
+  }
 
   return NextResponse.json(updated);
 }
 
+/**
+ * Removes the receipt from the user's lists. The row and its file are kept for
+ * the statutory retention period, and every entry booked from it is cancelled
+ * with a reversing entry instead of being deleted.
+ */
 export async function DELETE(_request: Request, context: RouteContext) {
   const receiptId = (await context.params).id;
   if (!receiptId) {
     return NextResponse.json({ error: "Missing receipt id." }, { status: 400 });
   }
 
-  const { businessId } = await requireAuthContext();
+  const { businessId, userId } = await requireAuthContext();
 
   const existing = await prisma.receipt.findUnique({
     where: { id: receiptId, businessId },
-    select: { id: true }
+    select: { id: true, deletedAt: true, transactions: { where: ACTIVE_TRANSACTION, select: { id: true } } }
   });
-  if (!existing) {
+  if (!existing || existing.deletedAt) {
     return NextResponse.json({ error: "Receipt not found." }, { status: 404 });
   }
 
-  const deleted = await prisma.$transaction(async (tx) => {
-    const removedTransactions = await tx.transaction.deleteMany({
-      where: { receiptId }
+  try {
+    const deleted = await prisma.$transaction(async (tx) => {
+      for (const transaction of existing.transactions) {
+        await voidTransaction(tx, {
+          businessId,
+          transactionId: transaction.id,
+          userId,
+          reason: "Receipt removed"
+        });
+      }
+
+      await tx.receipt.update({
+        where: { id: receiptId },
+        data: { deletedAt: new Date(), needsReview: false }
+      });
+
+      await writeLedgerAudit(tx, {
+        businessId,
+        userId,
+        entityType: "Receipt",
+        entityId: receiptId,
+        action: "DELETE",
+        after: { cancelledTransactions: existing.transactions.length }
+      });
+
+      return {
+        deletedReceiptId: receiptId,
+        // Kept for existing callers: the number of entries that no longer count.
+        deletedTransactions: existing.transactions.length
+      };
     });
 
-    await tx.receipt.delete({
-      where: { id: receiptId }
-    });
-
-    return {
-      deletedReceiptId: receiptId,
-      deletedTransactions: removedTransactions.count
-    };
-  });
-
-  return NextResponse.json(deleted);
+    return NextResponse.json(deleted);
+  } catch (error) {
+    const mapped = ledgerErrorResponse(error);
+    if (mapped) return NextResponse.json({ error: mapped.message }, { status: mapped.status });
+    throw error;
+  }
 }

@@ -44,14 +44,14 @@ export default async function ReviewPage() {
   const [needsReviewReceipts, recentReceipts, otherInputs] = await Promise.all([
     prisma.receipt.findMany({
       where: {
-        businessId: business.id,
+        businessId: business.id, deletedAt: null,
         needsReview: true
       },
       orderBy: { createdAt: "desc" },
       take: 50
     }),
     prisma.receipt.findMany({
-      where: { businessId: business.id },
+      where: { businessId: business.id, deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 50
     }),

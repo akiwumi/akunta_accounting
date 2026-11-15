@@ -1,32 +1,16 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
-import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
+import { customerDataFrom, customerFieldsSchema, customerSelect } from "@/lib/invoices/customers";
+import { authOrNull, jsonError, unauthorized, zodMessage } from "@/lib/invoices/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const customerSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  email: z.string().trim().email().max(120).optional().or(z.literal("")),
-  phone: z.string().trim().max(80).optional(),
-  website: z.string().trim().max(120).optional(),
-  addressLine1: z.string().trim().max(180).optional(),
-  addressLine2: z.string().trim().max(180).optional(),
-  city: z.string().trim().max(80).optional(),
-  postalCode: z.string().trim().max(40).optional(),
-  country: z.string().trim().max(80).optional(),
-  notes: z.string().trim().max(500).optional()
-});
-
 export async function GET(request: Request) {
-  let businessId: string;
-  try {
-    ({ businessId } = await requireAuthContext());
-  } catch {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
+  const auth = await authOrNull();
+  if (!auth) return unauthorized();
+  const { businessId } = auth;
 
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q")?.trim() ?? "";
@@ -39,8 +23,8 @@ export async function GET(request: Request) {
       ...(query
         ? {
             OR: [
-              { name: { contains: query } },
-              { email: { contains: query } },
+              { name: { contains: query, mode: "insensitive" } },
+              { email: { contains: query, mode: "insensitive" } },
               { phone: { contains: query } }
             ]
           }
@@ -48,102 +32,29 @@ export async function GET(request: Request) {
     },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
     take: limit,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      website: true,
-      addressLine1: true,
-      addressLine2: true,
-      city: true,
-      postalCode: true,
-      country: true,
-      notes: true
-    }
+    select: customerSelect
   });
 
   return NextResponse.json({ customers });
 }
 
+/** Creates a customer. A customer with the same email already in the register is updated instead of duplicated. */
 export async function POST(request: Request) {
-  let businessId: string;
-  try {
-    ({ businessId } = await requireAuthContext());
-  } catch {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
+  const auth = await authOrNull();
+  if (!auth) return unauthorized();
+  const { businessId } = auth;
 
-  const payload = customerSchema.parse(await request.json());
-  const normalizedEmail = payload.email?.trim() || null;
+  const parsed = customerFieldsSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return jsonError(zodMessage(parsed.error), 422);
+  const data = customerDataFrom(parsed.data);
 
-  const existing =
-    normalizedEmail &&
-    (await prisma.customer.findFirst({
-      where: {
-        businessId,
-        email: normalizedEmail
-      },
-      select: { id: true }
-    }));
+  const existing = data.email
+    ? await prisma.customer.findFirst({ where: { businessId, email: data.email }, select: { id: true } })
+    : null;
 
   const customer = existing
-    ? await prisma.customer.update({
-        where: { id: existing.id },
-        data: {
-          name: payload.name,
-          email: normalizedEmail,
-          phone: payload.phone?.trim() || null,
-          website: payload.website?.trim() || null,
-          addressLine1: payload.addressLine1?.trim() || null,
-          addressLine2: payload.addressLine2?.trim() || null,
-          city: payload.city?.trim() || null,
-          postalCode: payload.postalCode?.trim() || null,
-          country: payload.country?.trim() || null,
-          notes: payload.notes?.trim() || null
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          website: true,
-          addressLine1: true,
-          addressLine2: true,
-          city: true,
-          postalCode: true,
-          country: true,
-          notes: true
-        }
-      })
-    : await prisma.customer.create({
-        data: {
-          businessId,
-          name: payload.name,
-          email: normalizedEmail,
-          phone: payload.phone?.trim() || null,
-          website: payload.website?.trim() || null,
-          addressLine1: payload.addressLine1?.trim() || null,
-          addressLine2: payload.addressLine2?.trim() || null,
-          city: payload.city?.trim() || null,
-          postalCode: payload.postalCode?.trim() || null,
-          country: payload.country?.trim() || null,
-          notes: payload.notes?.trim() || null
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          website: true,
-          addressLine1: true,
-          addressLine2: true,
-          city: true,
-          postalCode: true,
-          country: true,
-          notes: true
-        }
-      });
+    ? await prisma.customer.update({ where: { id: existing.id }, data, select: customerSelect })
+    : await prisma.customer.create({ data: { businessId, ...data }, select: customerSelect });
 
-  return NextResponse.json({ customer });
+  return NextResponse.json({ customer, updatedExisting: Boolean(existing) });
 }

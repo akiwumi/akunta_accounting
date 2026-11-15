@@ -10,11 +10,13 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const errorParam = searchParams.get("error");
   const resetParam = searchParams.get("reset");
+  const expiredParam = searchParams.get("expired");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [successMsg] = useState<string | null>(
-    resetParam === "success" ? "Password updated. Sign in with your new credentials." : null
+    resetParam === "success" ? "Password updated. Sign in with your new credentials." :
+    expiredParam === "1" ? "You have been signed out. Sign in again to continue." : null
   );
   const [error, setError] = useState<string | null>(
     errorParam === "invalid_token" ? "That verification link is invalid or has expired." :
@@ -42,7 +44,7 @@ export default function LoginPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email: submittedEmail, password: submittedPassword })
       });
-      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      const payload = (await res.json().catch(() => ({}))) as { error?: string; hasBusiness?: boolean };
       if (!res.ok) {
         setError(payload.error ?? "Login failed.");
         setIsSubmitting(false);
@@ -52,7 +54,9 @@ export default function LoginPage() {
       // Hard redirect so the root layout gets a fresh server render with the
       // session cookie present — client-side router.replace() does not re-run
       // shared Server Component layouts, which would leave the sidebar missing.
-      setTimeout(() => { window.location.href = "/dashboard"; }, 340);
+      // Someone who belongs to no business gets the page that says so, not an error.
+      const destination = payload.hasBusiness === false ? "/login/no-access" : "/dashboard";
+      setTimeout(() => { window.location.href = destination; }, 340);
     } catch {
       setError("Unable to connect. Please try again.");
       setIsSubmitting(false);

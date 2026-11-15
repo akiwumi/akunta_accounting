@@ -1,6 +1,7 @@
 import { type Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
+import { assertDateNotLocked } from "@/lib/accounting/ledger";
 import { round2 } from "@/lib/accounting/math";
 import { EntrySources, TransactionDirections, type EntrySource, type TransactionDirection } from "@/lib/domain/enums";
 import { convertToSekAtDate, normalizeCurrency, type SupportedCurrency } from "@/lib/fx/sek";
@@ -58,6 +59,9 @@ const rebalanceLines = (lines: DraftLine[]) => {
 };
 
 export const createCashMethodTransaction = async (input: CreateCashTransactionInput) => {
+  // Checked here as well as in the dispatcher: several routes call this directly.
+  await assertDateNotLocked(prisma, input.businessId, input.txnDate);
+
   const bankAccountCode = input.bankAccountCode ?? "1930";
   const incomeAccountCode = input.incomeAccountCode ?? "3001";
   const expenseAccountCode = input.expenseAccountCode ?? "6110";
@@ -217,6 +221,85 @@ export const createCashMethodTransaction = async (input: CreateCashTransactionIn
         }
       }
     }
+  });
+};
+
+/**
+ * Money paid back to a customer (the refund behind a credit note).
+ *
+ * Booked as negative sales, not as a purchase: debit the income account and
+ * output VAT (2610), credit the bank. The entry keeps direction INCOME with
+ * negative amounts, so the VAT return lowers box 05 and the output VAT boxes
+ * instead of inflating input VAT in box 48.
+ */
+export const createSalesRefundTransaction = async (input: {
+  businessId: string;
+  txnDate: Date;
+  description: string;
+  /** Positive amount paid back, including VAT. */
+  grossAmount: number;
+  vatRate: number;
+  source: EntrySource;
+  reference?: string;
+  currency?: string;
+  incomeAccountCode?: string;
+  bankAccountCode?: string;
+}) => {
+  await assertDateNotLocked(prisma, input.businessId, input.txnDate);
+
+  const bankAccountCode = input.bankAccountCode ?? "1930";
+  const incomeAccountCode = input.incomeAccountCode ?? "3001";
+  const codes = [bankAccountCode, incomeAccountCode, "2610"];
+  const accounts = await prisma.account.findMany({
+    where: { businessId: input.businessId, code: { in: codes } }
+  });
+  const lookup = new Map(accounts.map((account) => [account.code, account]));
+  for (const code of codes) {
+    if (!lookup.get(code)) throw new Error(`Missing account ${code}. Ensure chart of accounts is initialized.`);
+  }
+
+  let gross = round2(Math.abs(input.grossAmount));
+  let sourceCurrency: SupportedCurrency | null = null;
+  let fxRateToSek: number | null = null;
+  let fxRateDate: Date | null = null;
+  const currency = normalizeCurrency(input.currency);
+  if (currency !== "SEK") {
+    const converted = await convertToSekAtDate({ currency, date: input.txnDate, grossAmount: gross });
+    gross = converted.grossAmountSek;
+    sourceCurrency = converted.sourceCurrency;
+    fxRateToSek = converted.fxRateToSek;
+    fxRateDate = converted.fxDate;
+  }
+
+  const vatRate = round4(Math.max(0, input.vatRate));
+  const net = vatRate > 0 ? round2(gross / (1 + vatRate)) : gross;
+  const vat = round2(gross - net);
+
+  return prisma.transaction.create({
+    data: {
+      businessId: input.businessId,
+      txnDate: input.txnDate,
+      description: input.description,
+      direction: TransactionDirections.INCOME,
+      grossAmount: -gross,
+      netAmount: -net,
+      vatAmount: -vat,
+      vatRate,
+      currency: "SEK",
+      sourceCurrency: sourceCurrency ?? undefined,
+      fxRateToSek: fxRateToSek ?? undefined,
+      fxRateDate: fxRateDate ?? undefined,
+      source: input.source,
+      reference: input.reference,
+      lines: {
+        create: [
+          { accountId: lookup.get(incomeAccountCode)!.id, debit: net, credit: 0 },
+          ...(vat > 0 ? [{ accountId: lookup.get("2610")!.id, debit: vat, credit: 0 }] : []),
+          { accountId: lookup.get(bankAccountCode)!.id, debit: 0, credit: gross, note: "counterparty_bank" }
+        ]
+      }
+    },
+    include: { lines: { include: { account: true } } }
   });
 };
 

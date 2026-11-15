@@ -20,7 +20,7 @@ type MileageLogProps = {
   currentYear: number;
 };
 
-const CURRENT_RATE = 1.85;
+const CURRENT_RATE = 2.5;
 
 const formatSEK = (amount: number) =>
   new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 }).format(amount);
@@ -53,11 +53,11 @@ export const MileageLog = ({ locale, initial, currentYear }: MileageLogProps) =>
     total: sv ? "Totalt avdrag" : "Total Deduction",
     totalKm: sv ? "Totalt km" : "Total km",
     noEntries: sv
-      ? "Inga resor registrerade. Dokumentera tjänsteresor för att beräkna milersättningsavdraget (1,85 kr/km)."
-      : "No trips logged. Record business trips to calculate the mileage deduction (SEK 1.85/km).",
+      ? "Inga resor registrerade. Dokumentera tjänsteresor för att beräkna milersättningsavdraget (2,50 kr/km)."
+      : "No trips logged. Record business trips to calculate the mileage deduction (SEK 2.50/km).",
     ruleNote: sv
-      ? `Skatteverkets schablonersättning ${new Date().getFullYear()}: 1,85 kr/km. Körjournalen styrker avdraget vid deklaration. Ange alltid affärssyfte och destination för varje resa. Totalt avdrag bokförs på konto 5810 (Körjournal – milersättning).`
-      : `Skatteverket standard rate ${new Date().getFullYear()}: SEK 1.85/km. The mileage log substantiates the deduction on filing. Always state business purpose and destination per trip. Post the total deduction to account 5810 (Mileage – Körjournal).`,
+      ? `Skatteverkets schablonersättning ${new Date().getFullYear()}: 2,50 kr/km. Körjournalen styrker avdraget vid deklaration. Ange alltid affärssyfte och destination för varje resa. Totalt avdrag bokförs på konto 5810 (Körjournal – milersättning).`
+      : `Skatteverket standard rate ${new Date().getFullYear()}: SEK 2.50/km. The mileage log substantiates the deduction on filing. Always state business purpose and destination per trip. Post the total deduction to account 5810 (Mileage – Körjournal).`,
     saving: sv ? "Sparar..." : "Saving...",
     error: sv ? "Fel" : "Error"
   };

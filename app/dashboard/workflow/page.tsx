@@ -49,7 +49,7 @@ export default async function DashboardWorkflowPage() {
 
   const [unReviewedReceipts, recentAuditLogs] = await Promise.all([
     prisma.receipt.count({
-      where: { businessId: business.id, needsReview: true }
+      where: { businessId: business.id, deletedAt: null, needsReview: true }
     }),
     prisma.auditLog.findMany({
       where: { businessId: business.id },

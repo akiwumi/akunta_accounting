@@ -19,13 +19,13 @@ export const ReceiptReviewActions = ({ receiptId, needsReview, locale }: Receipt
   const copy =
     locale === "sv"
       ? {
-          markReviewed: "Markera som granskad",
+          markReviewed: "Godkänn och bokför",
           markNeedsReview: "Markera för granskning",
           saving: "Sparar...",
           failed: "Kunde inte uppdatera granskningsstatus."
         }
       : {
-          markReviewed: "Mark as reviewed",
+          markReviewed: "Approve and book",
           markNeedsReview: "Mark as needs review",
           saving: "Saving...",
           failed: "Failed to update review status."

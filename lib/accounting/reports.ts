@@ -70,12 +70,11 @@ const fetchMovements = async ({ businessId, from, to }: PeriodInput): Promise<Ac
 
 export const buildProfitAndLoss = async (period: PeriodInput) => {
   const movements = await fetchMovements(period);
-  const incomeAccounts = movements
-    .filter((movement) => movement.accountType === AccountTypes.INCOME)
-    .map((movement) => ({ ...movement, amount: Math.abs(movement.amount) }));
-  const expenseAccounts = movements
-    .filter((movement) => movement.accountType === AccountTypes.EXPENSE)
-    .map((movement) => ({ ...movement, amount: Math.abs(movement.amount) }));
+  // Signed amounts: an income account that is net debit in the period (for
+  // example after a 1 January reversal of year-end receivables) must lower
+  // revenue, not raise it.
+  const incomeAccounts = movements.filter((movement) => movement.accountType === AccountTypes.INCOME);
+  const expenseAccounts = movements.filter((movement) => movement.accountType === AccountTypes.EXPENSE);
 
   const revenue = round2(incomeAccounts.reduce((sum, item) => sum + item.amount, 0));
   const expenses = round2(expenseAccounts.reduce((sum, item) => sum + item.amount, 0));
@@ -91,24 +90,58 @@ export const buildProfitAndLoss = async (period: PeriodInput) => {
   };
 };
 
+/**
+ * Balance sheet as at `period.to`.
+ *
+ * Balance accounts are cumulative, so the report cannot be built from the
+ * movements inside the requested range alone. If the fiscal year has opening
+ * balances (written by the year-end close or entered by hand) the balance is
+ * opening balance + movements since the start of that year. Otherwise every
+ * movement up to `period.to` is counted. Amounts keep their natural sign, so
+ * an overdrawn bank account shows as negative.
+ *
+ * Fiscal years are calendar years here, as in lib/accounting/year-end.ts.
+ */
 export const buildBalanceSheet = async (period: PeriodInput) => {
-  const movements = await fetchMovements(period);
-  const assets = movements
-    .filter((movement) => movement.accountType === AccountTypes.ASSET)
-    .map((movement) => ({ ...movement, amount: Math.abs(movement.amount) }));
-  const liabilities = movements
-    .filter((movement) => movement.accountType === AccountTypes.LIABILITY)
-    .map((movement) => ({ ...movement, amount: Math.abs(movement.amount) }));
-  const equity = movements
-    .filter((movement) => movement.accountType === AccountTypes.EQUITY)
-    .map((movement) => ({ ...movement, amount: Math.abs(movement.amount) }));
+  const fiscalYear = period.to.getUTCFullYear();
+  const openingRows = await prisma.openingBalance.findMany({
+    where: { businessId: period.businessId, fiscalYear },
+    include: { account: true }
+  });
+  const windowStart = openingRows.length > 0 ? new Date(Date.UTC(fiscalYear, 0, 1)) : new Date(0);
 
-  const pnl = await buildProfitAndLoss(period);
-  const currentYearResult = pnl.operatingProfit;
+  const movements = await fetchMovements({ businessId: period.businessId, from: windowStart, to: period.to });
+  const byCode = new Map(movements.map((movement) => [movement.accountCode, { ...movement }]));
+  for (const row of openingRows) {
+    const opening = asNumber(row.amount as unknown as string | number);
+    const existing = byCode.get(row.account.code);
+    if (existing) {
+      existing.amount = round2(existing.amount + opening);
+    } else {
+      byCode.set(row.account.code, {
+        accountCode: row.account.code,
+        accountName: row.account.name,
+        accountType: row.account.type as AccountType,
+        debit: 0,
+        credit: 0,
+        amount: round2(opening)
+      });
+    }
+  }
+  const balances = [...byCode.values()].sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+  const ofType = (type: AccountType) => balances.filter((item) => item.accountType === type);
+  const total = (items: AccountMovement[]) => round2(items.reduce((sum, item) => sum + item.amount, 0));
 
-  const totalAssets = round2(assets.reduce((sum, item) => sum + item.amount, 0));
-  const totalLiabilities = round2(liabilities.reduce((sum, item) => sum + item.amount, 0));
-  const totalEquity = round2(equity.reduce((sum, item) => sum + item.amount, 0));
+  const assets = ofType(AccountTypes.ASSET).filter((item) => item.amount !== 0);
+  const liabilities = ofType(AccountTypes.LIABILITY).filter((item) => item.amount !== 0);
+  const equity = ofType(AccountTypes.EQUITY).filter((item) => item.amount !== 0);
+
+  // Result not yet transferred to equity: the same window as the balances above.
+  const currentYearResult = round2(total(ofType(AccountTypes.INCOME)) - total(ofType(AccountTypes.EXPENSE)));
+
+  const totalAssets = total(assets);
+  const totalLiabilities = total(liabilities);
+  const totalEquity = total(equity);
   const liabilitiesAndEquity = round2(totalLiabilities + totalEquity + currentYearResult);
 
   return {
@@ -150,7 +183,8 @@ export const buildVatReport = async (period: PeriodInput) => {
   for (const transaction of transactions) {
     const vatAmount = asNumber(transaction.vatAmount as unknown as string | number);
     const netAmount = asNumber(transaction.netAmount as unknown as string | number);
-    const hasVat = vatAmount > 0;
+    // Not "> 0": a correcting entry carries negative amounts and must net out.
+    const hasVat = vatAmount !== 0;
 
     if (transaction.direction === TransactionDirections.INCOME && hasVat) {
       outputVat = round2(outputVat + vatAmount);
@@ -193,6 +227,11 @@ export const buildVatReport = async (period: PeriodInput) => {
  *   ExpF_all  – Avsättning expansionsfond (Allocation to expansion fund)
  *   R47  – Överskott/underskott (Surplus/deficit before tax adjustments)
  *   R48  – Taxable result after periodiseringsfond and expansionsfond
+ */
+/**
+ * @deprecated The box numbers here do not match the NE form. Use buildNeBilaga
+ * (lib/tax/neBilaga.ts) or buildNeRows (lib/tax/neRows.ts). Kept only for the
+ * unfinished Inkomstdeklaration 1 draft in lib/integrations/skatteverket.
  */
 export const buildNeBilagaDraft = async (period: PeriodInput) => {
   const taxYear = period.to.getFullYear();

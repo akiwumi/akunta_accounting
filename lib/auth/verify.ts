@@ -1,4 +1,4 @@
-import { createSession } from "@/lib/auth/session";
+import { createSession, pickLoginBusinessId } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 
 export type EmailVerificationResult =
@@ -20,8 +20,7 @@ export async function verifyEmailToken(token: string): Promise<EmailVerification
   }
 
   const user = await prisma.user.findUnique({
-    where: { emailVerificationToken: token },
-    include: { memberships: { take: 1 } }
+    where: { emailVerificationToken: token }
   });
 
   if (!user) {
@@ -35,7 +34,7 @@ export async function verifyEmailToken(token: string): Promise<EmailVerification
     });
   }
 
-  const businessId = user.memberships[0]?.businessId;
+  const businessId = await pickLoginBusinessId(user.id);
   if (!businessId) {
     return { ok: false, code: "no_business" };
   }

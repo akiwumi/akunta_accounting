@@ -41,8 +41,8 @@ const supabaseStore = async (buffer: Buffer, key: string): Promise<StoredInvoice
   const bucket = process.env.SUPABASE_INVOICE_BUCKET ?? "invoices";
   const { error } = await supabase.storage.from(bucket).upload(key, buffer, { contentType: "application/pdf", upsert: true });
   if (error) throw new Error(`Supabase invoice storage failed: ${error.message}`);
-  const { data } = supabase.storage.from(bucket).getPublicUrl(key);
-  return { key, url: data.publicUrl };
+  // The bucket must be private: no public URL is produced, files are read back by key.
+  return { key, url: key };
 };
 
 const supabaseRead = async (key: string): Promise<Buffer> => {

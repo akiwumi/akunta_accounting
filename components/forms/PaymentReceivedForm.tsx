@@ -8,6 +8,8 @@ type PaymentReceivedResponse = {
   transaction?: {
     id: string;
   };
+  /** Set when part of the payment could not be matched to the invoice (for example an overpayment). */
+  notice?: string;
   error?: string;
 };
 
@@ -190,6 +192,7 @@ export const PaymentReceivedForm = ({ locale }: { locale: Locale }) => {
           <p className="note">
             {copy.transactionId}: {result.transaction.id}
           </p>
+          {result.notice && <p className="note">{result.notice}</p>}
         </div>
       )}
     </form>

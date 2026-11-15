@@ -1,13 +1,15 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
+import { cookies } from "next/headers";
+
+import { setBusinessCookies, setSessionCookies } from "@/lib/auth/cookies";
 import {
-  AUTH_COOKIE_MAX_AGE_SECONDS,
-  AUTH_COOKIE_NAME,
-  AUTH_INDICATOR_COOKIE,
   createSession,
   findUserByEmail,
-  getUserBusinessId,
+  LAST_BUSINESS_COOKIE,
+  NO_BUSINESS_ID,
+  pickLoginBusinessId,
   verifyUserCredentials
 } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
@@ -58,36 +60,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid login credentials." }, { status: 401 });
     }
 
-    const businessId = await getUserBusinessId(user.id);
-    if (!businessId) {
-      return NextResponse.json({ error: "No business found for this account." }, { status: 403 });
+    // The business last worked in if the person still belongs to it, otherwise
+    // their first. The cookie is only a hint and is checked against their own
+    // memberships. Someone with no membership at all still gets a session, in
+    // no business, and lands on the page that explains it.
+    const lastUsed = (await cookies()).get(LAST_BUSINESS_COOKIE)?.value ?? null;
+    const businessId = await pickLoginBusinessId(user.id, lastUsed);
+
+    const membership = businessId
+      ? await prisma.membership.findUnique({
+          where: { userId_businessId: { userId: user.id, businessId } },
+          select: { role: true, business: { select: { locale: true } } }
+        })
+      : null;
+
+    const token = await createSession(user.id, membership && businessId ? businessId : NO_BUSINESS_ID);
+
+    const response = NextResponse.json({ ok: true, userId: user.id, hasBusiness: Boolean(membership) });
+    setSessionCookies(response, token);
+    await setBusinessCookies(response, token, membership && businessId ? { businessId, role: membership.role } : null);
+    if (membership) {
+      // Business locale as the starting language, unless the person already chose one.
+      const chosen = (await cookies()).get("locale")?.value;
+      if (chosen !== "en" && chosen !== "sv") {
+        response.cookies.set("locale", membership.business.locale ?? "en", {
+          sameSite: "lax" as const,
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          httpOnly: false,
+          maxAge: 60 * 60 * 24 * 365
+        });
+      }
     }
-
-    // Fetch the business locale so it can be set as a cookie at login time
-    const business = await prisma.business.findFirst({
-      where: { memberships: { some: { userId: user.id } } },
-      select: { locale: true }
-    });
-    const locale = business?.locale ?? "en";
-
-    const token = await createSession(user.id, businessId);
-
-    const response = NextResponse.json({ ok: true, userId: user.id });
-    const cookieOpts = {
-      sameSite: "lax" as const,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: AUTH_COOKIE_MAX_AGE_SECONDS
-    };
-    response.cookies.set(AUTH_COOKIE_NAME, token, { ...cookieOpts, httpOnly: true });
-    response.cookies.set(AUTH_INDICATOR_COOKIE, "1", { ...cookieOpts, httpOnly: false });
-    response.cookies.set("locale", locale, {
-      sameSite: "lax" as const,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      httpOnly: false,
-      maxAge: 60 * 60 * 24 * 365
-    });
 
     return response;
   } catch (error) {

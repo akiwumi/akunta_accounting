@@ -4,66 +4,47 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { CustomerPicker } from "@/components/invoices/CustomerPicker";
+import { InvoiceActions, type InvoiceActionData } from "@/components/invoices/InvoiceActions";
+import { LineItemsEditor } from "@/components/invoices/LineItemsEditor";
+import { type RotRutDraft, RotRutForm, rotRutPayload } from "@/components/invoices/RotRutForm";
+import {
+  type CustomerDraft,
+  type CustomerOption,
+  customerAddressLine,
+  customerFromOption,
+  customerPayload,
+  draftsToItems,
+  draftsToRotRutItems,
+  emptyCustomer,
+  type LineItemDraft,
+  makeLineItem,
+  rotRutDraftLines,
+  totalsOfDrafts
+} from "@/lib/invoices/drafts";
+import { computeRotRut } from "@/lib/invoices/rotrut";
+import { RecurringList, type RecurringRow } from "@/components/invoices/RecurringList";
 import { formatMoney } from "@/lib/data/format";
-import { computeInvoiceTotals, normalizeVatRate } from "@/lib/invoices/calculations";
 import { formatInvoiceNumber } from "@/lib/invoices/numbering";
-import { InvoiceVatModes, type InvoiceVatMode } from "@/lib/invoices/types";
+import { type InvoiceStatusKind } from "@/lib/invoices/status";
 import { type Locale } from "@/lib/i18n/locale";
 
-type InvoiceItemDraft = {
-  key: string;
-  description: string;
-  quantity: string;
-  unitPrice: string;
-  vatMode: InvoiceVatMode;
-  vatRate: string;
-};
-
-type CustomerDraft = {
-  id?: string;
-  name: string;
-  email: string;
-  phone: string;
-  website: string;
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  postalCode: string;
-  country: string;
-};
-
-type InvoiceRow = {
-  id: string;
-  invoiceNumber: string;
-  customerName: string;
-  customerEmail: string | null;
-  issueDate: string;
-  dueDate: string | null;
-  grossAmount: number;
-  currency: string;
-  status: string;
-  paidAt: string | null;
-  sentAt: string | null;
-  paidTransactionId: string | null;
-};
-
-type CustomerOption = {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  website: string | null;
-  addressLine1: string | null;
-  addressLine2: string | null;
-  city: string | null;
-  postalCode: string | null;
-  country: string | null;
+export type InvoiceRow = InvoiceActionData & {
+  customerId: string | null;
+  statusLabel: string;
+  statusTone: "good" | "warn" | "";
 };
 
 type InvoicesManagerProps = {
   locale: Locale;
   rows: InvoiceRow[];
   customers: CustomerOption[];
+  recurring: RecurringRow[];
+  /** Customer to start a new invoice for (from the customer register). */
+  prefillCustomerId?: string | null;
+  /** Shown between the totals and the form: what needs doing now (ROT/RUT requests). */
+  afterSummary?: React.ReactNode;
+  totals: { outstanding: number; overdue: number; overdueCount: number; currency: string };
   defaults: {
     businessName: string;
     invoiceNumberPattern: string;
@@ -76,33 +57,33 @@ type InvoicesManagerProps = {
     senderWebsite: string;
     defaultLogo: string;
     defaultSignature: string;
+    paymentTermsDays: number;
+    vatRegistered: boolean;
+    /** ROT/RUT is only offered to a business approved for F-skatt. */
+    fSkattRegistered: boolean;
+    /** Fakturametoden: ROT/RUT is not available there yet. */
+    accrual: boolean;
+    currency: string;
+    /** Bankgiro, plusgiro, Swish, IBAN as set in settings. Empty when none is set. */
+    paymentLines: { label: string; value: string }[];
   };
   filters: {
     year: number;
     month: number | null;
     query: string;
+    show: "period" | "open" | "overdue";
     yearOptions: number[];
   };
 };
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
-const dueDateIso = (days = 14) => {
-  const target = new Date();
-  target.setUTCDate(target.getUTCDate() + days);
-  return target.toISOString().slice(0, 10);
+const localIso = (date: Date) => new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+const todayIso = () => localIso(new Date());
+const addDaysIso = (iso: string, days: number) => {
+  const date = new Date(`${iso}T00:00:00.000Z`);
+  if (Number.isNaN(date.valueOf())) return "";
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 };
-
-const makeItem = (overrides: Partial<InvoiceItemDraft> = {}): InvoiceItemDraft => ({
-  key: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  description: "",
-  quantity: "1",
-  unitPrice: "",
-  vatMode: InvoiceVatModes.NO_VAT,
-  vatRate: "0.25",
-  ...overrides
-});
-
-const toNumber = (value: string) => Number(value.replace(",", "."));
 
 const readFileAsDataUrl = async (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -112,198 +93,217 @@ const readFileAsDataUrl = async (file: File) =>
     reader.readAsDataURL(file);
   });
 
-export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: InvoicesManagerProps) => {
+export const InvoicesManager = ({
+  locale,
+  rows,
+  customers,
+  recurring,
+  prefillCustomerId,
+  afterSummary,
+  totals,
+  defaults,
+  filters
+}: InvoicesManagerProps) => {
   const router = useRouter();
   const numberLocale = locale === "sv" ? "sv-SE" : "en-GB";
 
   const copy =
     locale === "sv"
       ? {
-          createTitle: "Skapa ny faktura",
+          createTitle: "Ny faktura",
+          createIntro: "Välj kund, skriv vad du sålt och spara. Nummer, förfallodatum och OCR sätts åt dig.",
           previewTitle: "Förhandsvisning",
           saveInvoice: "Spara faktura",
           savingInvoice: "Sparar...",
-          invoiceSaved: "Faktura skapad.",
+          invoiceSaved: (number: string) => `Faktura ${number} är sparad. Skicka den direkt eller ladda ner PDF:en.`,
           createFailed: "Kunde inte skapa fakturan.",
           unknownError: "Okänt fel",
+          customerSection: "Kund",
+          itemsSection: "Vad fakturan gäller",
+          rotRutSection: "Rot och rut",
+          rotRutStage: (type: string, stage: string) =>
+            `${type === "ROT" ? "Rot" : "Rut"}: ${
+              stage === "awaiting_customer"
+                ? "väntar på kundens del"
+                : stage === "ready"
+                  ? "redo att begära från Skatteverket"
+                  : stage === "requested"
+                    ? "begärt, väntar på Skatteverket"
+                    : "utbetalt av Skatteverket"
+            }`,
+          rotRutReduction: (word: string, percent: number) => `Preliminärt ${word}avdrag ${percent} %`,
+          rotRutLabour: "Varav arbete inkl. moms",
+          rotRutCustomerPays: "Kunden betalar",
+          totalInclVat: "Summa inkl. moms",
+          rotRutPreviewNote: (amount: string) =>
+            `Resten, ${amount}, begär du från Skatteverket när kunden har betalat. Kunden ska betala elektroniskt.`,
+          detailsSection: "Nummer, datum och valuta",
           invoiceNumber: "Fakturanummer",
-          usePatternNumber: "Använd mönsternummer",
-          project: "Projekt",
+          usePatternNumber: "Återställ till nästa nummer",
+          project: "Projekt eller referens",
           issueDate: "Fakturadatum",
           dueDate: "Förfallodatum",
+          dueHint: (days: number) => `Standard: ${days} dagar. Ändras under Inställningar.`,
           currency: "Valuta",
           myDetails: "Mina uppgifter",
-          clientDetails: "Kunduppgifter",
-          paymentDetails: "Betalningsuppgifter",
-          addNotes: "Anteckning",
-          addSignature: "Signatur och logotyp",
-          emailDetails: "E-post",
+          paymentSection: "Så betalar kunden",
+          paymentAuto: "Skrivs ut på fakturan tillsammans med belopp, förfallodatum och OCR-nummer:",
+          paymentMissing:
+            "Du har inte lagt in något bankgiro, plusgiro, Swish eller IBAN ännu, så fakturan säger inte hur kunden ska betala.",
+          paymentSettings: "Lägg till betalningsuppgifter",
+          paymentExtra: "Extra betalningsinformation (valfritt)",
+          notesSection: "Meddelande till kunden",
+          brandingSection: "Logotyp och signatur",
           senderName: "Avsändare",
           senderAddress: "Adress",
           senderOrg: "Org.nr",
           senderEmail: "E-post",
           senderPhone: "Telefon",
           senderWebsite: "Webbplats",
-          customerName: "Kundnamn",
-          customerEmail: "Kundens e-post",
-          customerPhone: "Kundens telefon",
-          customerWebsite: "Kundens webbplats",
-          customerAddress1: "Adressrad 1",
-          customerAddress2: "Adressrad 2",
-          customerPostal: "Postnummer",
-          customerCity: "Stad",
-          customerCountry: "Land",
-          saveCustomer: "Spara kundprofil",
-          customerSaved: "Kundprofil sparad.",
-          itemsTitle: "Fakturarader",
           description: "Beskrivning",
           units: "Antal",
           price: "Pris",
-          vatMode: "Momsläge",
-          noVat: "Ingen moms",
-          vatInc: "Inkl. moms",
-          vatEx: "Exkl. moms",
-          vatRate: "Momssats",
-          addItem: "Lägg till rad",
-          remove: "Radera",
-          subtotal: "Delsumma",
+          subtotal: "Summa exkl. moms",
           vatAmount: "Moms",
-          total: "Totalt",
-          notes: "Notering",
-          paymentMethod: "Betalningsmetod",
-          paymentInfo: "Betalningsinstruktion",
-          emailTo: "E-post till faktura",
+          total: "Att betala",
+          notes: "Meddelande på fakturan",
+          bookDescription: "Text i bokföringen när fakturan betalas (valfritt)",
           logo: "Logotyp",
           signature: "Signatur",
           clearImage: "Rensa",
-          savePdf: "PDF",
-          emailPdf: "E-posta",
-          emailPrompt: "Ange e-postadress för fakturan",
-          emailing: "Skickar...",
-          emailed: "Fakturan skickades.",
-          emailFailed: "Kunde inte e-posta fakturan.",
-          invoiceListTitle: "Fakturor",
-          filterTitle: "Sök fakturor",
+          from: "Från",
+          to: "Till",
+          invoiceWord: "Faktura",
+          ocrAuto: "OCR-nummer skapas när du sparar",
+          listTitle: "Fakturor",
+          show: "Visa",
+          showPeriod: "Alla i perioden",
+          showOpen: "Obetalda, alla perioder",
+          showOverdue: "Försenade, alla perioder",
           year: "År",
           month: "Månad",
           allMonths: "Alla månader",
           search: "Sök",
           searchPlaceholder: "Fakturanummer, kund eller projekt",
-          filter: "Filtrera",
+          filter: "Visa",
+          customer: "Kund",
+          amount: "Belopp",
+          remaining: "Kvar att betala",
           status: "Status",
-          paid: "Betald",
-          unpaid: "Obetald",
-          paidDate: "Betald datum",
-          sentDate: "Skickad",
-          action: "Åtgärd",
-          paymentDatePrompt: "Ange betalningsdatum (ÅÅÅÅ-MM-DD)",
-          markPaid: "Markera betald",
-          markingPaid: "Markerar...",
-          payFailed: "Kunde inte markera fakturan som betald.",
-          reviewPayment: "Granska betalning",
-          downloadPdf: "Ladda ner PDF",
-          noInvoices: "Inga fakturor hittades.",
-          notSavedYet: "Spara fakturan först för PDF/e-post."
+          nextStep: "Nästa steg",
+          noInvoices: "Inga fakturor här ännu.",
+          noInvoicesHint: "Skapa din första faktura i formuläret ovanför.",
+          outstanding: "Obetalt just nu",
+          overdue: "Försenat",
+          overdueCount: (n: number) => (n === 1 ? "1 faktura" : `${n} fakturor`),
+          seeOverdue: "Visa försenade",
+          customers: "Kundregister",
+          quotes: "Offerter"
         }
       : {
-          createTitle: "Create New Invoice",
+          createTitle: "New invoice",
+          createIntro: "Pick a customer, write what you sold and save. Number, due date and OCR are set for you.",
           previewTitle: "Preview",
-          saveInvoice: "Save Invoice",
+          saveInvoice: "Save invoice",
           savingInvoice: "Saving...",
-          invoiceSaved: "Invoice created.",
+          invoiceSaved: (number: string) => `Invoice ${number} is saved. Send it right away or download the PDF.`,
           createFailed: "Failed to create invoice.",
           unknownError: "Unknown error",
-          invoiceNumber: "Invoice Number",
-          usePatternNumber: "Use pattern number",
-          project: "Project",
-          issueDate: "Issue Date",
-          dueDate: "Due Date",
+          customerSection: "Customer",
+          itemsSection: "What the invoice is for",
+          rotRutSection: "ROT and RUT",
+          rotRutStage: (type: string, stage: string) =>
+            `${type}: ${
+              stage === "awaiting_customer"
+                ? "waiting for the customer's part"
+                : stage === "ready"
+                  ? "ready to request from Skatteverket"
+                  : stage === "requested"
+                    ? "requested, waiting for Skatteverket"
+                    : "paid by Skatteverket"
+            }`,
+          rotRutReduction: (word: string, percent: number) => `Preliminary ${word} ${percent} %`,
+          rotRutLabour: "Of which labour incl. VAT",
+          rotRutCustomerPays: "The customer pays",
+          totalInclVat: "Total incl. VAT",
+          rotRutPreviewNote: (amount: string) =>
+            `The rest, ${amount}, you request from Skatteverket once the customer has paid. The customer must pay electronically.`,
+          detailsSection: "Number, dates and currency",
+          invoiceNumber: "Invoice number",
+          usePatternNumber: "Reset to the next number",
+          project: "Project or reference",
+          issueDate: "Invoice date",
+          dueDate: "Due date",
+          dueHint: (days: number) => `Default: ${days} days. Change it under Settings.`,
           currency: "Currency",
-          myDetails: "My Details",
-          clientDetails: "Client Details",
-          paymentDetails: "Payment Details",
-          addNotes: "Add Notes",
-          addSignature: "Add Signature",
-          emailDetails: "Email Details",
+          myDetails: "My details",
+          paymentSection: "How the customer pays",
+          paymentAuto: "Printed on the invoice together with the amount, due date and OCR reference:",
+          paymentMissing:
+            "You have not added a bankgiro, plusgiro, Swish or IBAN yet, so the invoice does not say how the customer should pay.",
+          paymentSettings: "Add payment details",
+          paymentExtra: "Extra payment information (optional)",
+          notesSection: "Message to the customer",
+          brandingSection: "Logo and signature",
           senderName: "Sender name",
           senderAddress: "Address",
           senderOrg: "Registration no.",
           senderEmail: "Email",
           senderPhone: "Phone",
           senderWebsite: "Website",
-          customerName: "Customer name",
-          customerEmail: "Customer email",
-          customerPhone: "Customer phone",
-          customerWebsite: "Customer website",
-          customerAddress1: "Address line 1",
-          customerAddress2: "Address line 2",
-          customerPostal: "Postal code",
-          customerCity: "City",
-          customerCountry: "Country",
-          saveCustomer: "Save customer profile",
-          customerSaved: "Customer profile saved.",
-          itemsTitle: "Invoice Items",
           description: "Description",
-          units: "Units",
+          units: "Qty",
           price: "Price",
-          vatMode: "VAT Mode",
-          noVat: "No VAT",
-          vatInc: "Incl. VAT",
-          vatEx: "Excl. VAT",
-          vatRate: "VAT Rate",
-          addItem: "Add item",
-          remove: "Remove",
-          subtotal: "Subtotal",
+          subtotal: "Total excl. VAT",
           vatAmount: "VAT",
-          total: "Total Amount",
-          notes: "Note",
-          paymentMethod: "Payment method",
-          paymentInfo: "Payment instructions",
-          emailTo: "Invoice email",
+          total: "To pay",
+          notes: "Message on the invoice",
+          bookDescription: "Text in the books when the invoice is paid (optional)",
           logo: "Logo",
           signature: "Signature",
           clearImage: "Clear",
-          savePdf: "PDF",
-          emailPdf: "Email",
-          emailPrompt: "Enter recipient email",
-          emailing: "Emailing...",
-          emailed: "Invoice emailed.",
-          emailFailed: "Failed to email invoice.",
-          invoiceListTitle: "Invoices",
-          filterTitle: "Search Invoices",
+          from: "From",
+          to: "To",
+          invoiceWord: "Invoice",
+          ocrAuto: "OCR reference is created when you save",
+          listTitle: "Invoices",
+          show: "Show",
+          showPeriod: "All in the period",
+          showOpen: "Unpaid, all periods",
+          showOverdue: "Overdue, all periods",
           year: "Year",
           month: "Month",
           allMonths: "All months",
           search: "Search",
           searchPlaceholder: "Invoice number, customer or project",
-          filter: "Filter",
+          filter: "Show",
+          customer: "Customer",
+          amount: "Amount",
+          remaining: "Left to pay",
           status: "Status",
-          paid: "Paid",
-          unpaid: "Unpaid",
-          paidDate: "Paid Date",
-          sentDate: "Sent",
-          action: "Action",
-          paymentDatePrompt: "Enter payment date (YYYY-MM-DD)",
-          markPaid: "Mark as paid",
-          markingPaid: "Marking...",
-          payFailed: "Failed to mark invoice as paid.",
-          reviewPayment: "Review payment",
-          downloadPdf: "Download PDF",
-          noInvoices: "No invoices found.",
-          notSavedYet: "Save the invoice first to use PDF and email."
+          nextStep: "Next step",
+          noInvoices: "No invoices here yet.",
+          noInvoicesHint: "Create your first invoice in the form above.",
+          outstanding: "Unpaid right now",
+          overdue: "Overdue",
+          overdueCount: (n: number) => (n === 1 ? "1 invoice" : `${n} invoices`),
+          seeOverdue: "Show overdue",
+          customers: "Customer register",
+          quotes: "Quotes"
         };
+
+  const prefilled = prefillCustomerId ? customers.find((option) => option.id === prefillCustomerId) : undefined;
 
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceNumberTouched, setInvoiceNumberTouched] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [issueDate, setIssueDate] = useState(todayIso());
-  const [dueDate, setDueDate] = useState(dueDateIso(14));
-  const [currency, setCurrency] = useState("SEK");
+  const [dueDate, setDueDate] = useState("");
+  const [dueDateTouched, setDueDateTouched] = useState(false);
+  const [currency, setCurrency] = useState(defaults.currency || "SEK");
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("Bank transfer");
   const [paymentDetails, setPaymentDetails] = useState("");
-  const [emailTo, setEmailTo] = useState("");
   const [senderName, setSenderName] = useState(defaults.senderName || defaults.businessName);
   const [senderAddress, setSenderAddress] = useState(defaults.senderAddress || "");
   const [senderOrg, setSenderOrg] = useState(defaults.senderOrgNumber || "");
@@ -312,31 +312,12 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
   const [senderWebsite, setSenderWebsite] = useState(defaults.senderWebsite || "");
   const [logoDataUrl, setLogoDataUrl] = useState(defaults.defaultLogo || "");
   const [signatureDataUrl, setSignatureDataUrl] = useState(defaults.defaultSignature || "");
-  const [customer, setCustomer] = useState<CustomerDraft>({
-    name: "",
-    email: "",
-    phone: "",
-    website: "",
-    addressLine1: "",
-    addressLine2: "",
-    city: "",
-    postalCode: "",
-    country: ""
-  });
-  const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>(customers);
-  const [items, setItems] = useState<InvoiceItemDraft[]>([
-    makeItem({
-      description: "",
-      quantity: "1",
-      unitPrice: ""
-    })
-  ]);
+  const [customer, setCustomer] = useState<CustomerDraft>(prefilled ? customerFromOption(prefilled) : emptyCustomer());
+  const [items, setItems] = useState<LineItemDraft[]>(() => [makeLineItem(defaults.vatRegistered)]);
+  const [rotRut, setRotRut] = useState<RotRutDraft | null>(null);
   const [saving, setSaving] = useState(false);
-  const [emailingId, setEmailingId] = useState<string | null>(null);
-  const [payingId, setPayingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [lastSavedInvoiceId, setLastSavedInvoiceId] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<InvoiceActionData | null>(null);
 
   const suggestedInvoiceNumber = useMemo(() => {
     const parsedIssueDate = new Date(`${issueDate}T00:00:00.000Z`);
@@ -348,122 +329,50 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
     });
   }, [defaults.invoiceNumberPattern, defaults.nextInvoiceSequence, issueDate]);
 
-  // Follow the pattern-suggested number until the user edits the field.
+  // Follow the pattern-suggested number, and the payment terms, until the user edits the field.
   const effectiveInvoiceNumber = invoiceNumberTouched ? invoiceNumber : suggestedInvoiceNumber;
+  const effectiveDueDate = dueDateTouched ? dueDate : addDaysIso(issueDate, defaults.paymentTermsDays);
 
-  const computed = useMemo(
-    () =>
-      computeInvoiceTotals(
-        items.map((item) => ({
-          description: item.description,
-          quantity: toNumber(item.quantity || "0"),
-          unitPrice: toNumber(item.unitPrice || "0"),
-          vatMode: item.vatMode,
-          vatRate: normalizeVatRate(toNumber(item.vatRate || "0"))
-        }))
-      ),
-    [items]
-  );
+  const computed = useMemo(() => totalsOfDrafts(items), [items]);
+  // ROT/RUT: what the customer pays is the total minus the preliminary reduction.
+  const rotRutAllowed = defaults.fSkattRegistered && !defaults.accrual;
+  const rotRutType = rotRutAllowed && rotRut ? rotRut.type : null;
+  const reduction = useMemo(() => {
+    if (!rotRutType) return null;
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(issueDate) ? issueDate : todayIso();
+    return computeRotRut({ type: rotRutType, date, lines: rotRutDraftLines(items, rotRutType) });
+  }, [rotRutType, issueDate, items]);
+  const customerPays = reduction ? Math.max(0, Math.round((computed.grossAmount - reduction.deduction) * 100) / 100) : computed.grossAmount;
+  const rotRutWord = rotRutType === "ROT" ? "rot" : locale === "sv" ? "rut" : "RUT";
 
   const monthLabels = useMemo(
     () =>
       Array.from({ length: 12 }).map((_value, index) => ({
         value: index + 1,
-        label: new Intl.DateTimeFormat(numberLocale, { month: "long" }).format(
-          new Date(Date.UTC(2026, index, 1))
-        )
+        label: new Intl.DateTimeFormat(numberLocale, { month: "long" }).format(new Date(Date.UTC(2026, index, 1)))
       })),
     [numberLocale]
   );
 
-  const customerSuggestions = useMemo(() => {
-    const q = customer.name.trim().toLowerCase();
-    if (!q) return customerOptions.slice(0, 6);
-    return customerOptions
-      .filter((option) => {
-        const haystack = [option.name, option.email ?? "", option.phone ?? ""].join(" ").toLowerCase();
-        return haystack.includes(q);
-      })
-      .slice(0, 6);
-  }, [customer.name, customerOptions]);
-
-  const customerAddressPreview = [
-    customer.addressLine1,
-    customer.addressLine2,
-    customer.postalCode,
-    customer.city,
-    customer.country
-  ]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(", ");
+  const customerAddressPreview = customerAddressLine(customer);
 
   const resetDraft = () => {
     setInvoiceNumberTouched(false);
+    setDueDateTouched(false);
     setProjectName("");
     setDescription("");
     setNotes("");
     setIssueDate(todayIso());
-    setDueDate(dueDateIso(14));
-    setCurrency("SEK");
-    setCustomer({
-      name: "",
-      email: "",
-      phone: "",
-      website: "",
-      addressLine1: "",
-      addressLine2: "",
-      city: "",
-      postalCode: "",
-      country: ""
-    });
-    setItems([makeItem()]);
-    setEmailTo("");
-  };
-
-  const updateItem = (key: string, patch: Partial<InvoiceItemDraft>) => {
-    setItems((current) => current.map((item) => (item.key === key ? { ...item, ...patch } : item)));
-  };
-
-  const onSaveCustomer = async () => {
-    if (!customer.name.trim()) return;
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const response = await fetch("/api/customers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: customer.name.trim(),
-          email: customer.email.trim() || undefined,
-          phone: customer.phone.trim() || undefined,
-          website: customer.website.trim() || undefined,
-          addressLine1: customer.addressLine1.trim() || undefined,
-          addressLine2: customer.addressLine2.trim() || undefined,
-          city: customer.city.trim() || undefined,
-          postalCode: customer.postalCode.trim() || undefined,
-          country: customer.country.trim() || undefined
-        })
-      });
-      const json = (await response.json()) as { error?: string; customer?: CustomerOption };
-      if (!response.ok || !json.customer) {
-        throw new Error(json.error ?? copy.unknownError);
-      }
-
-      setCustomer((current) => ({ ...current, id: json.customer!.id }));
-      setCustomerOptions((current) => [json.customer!, ...current.filter((item) => item.id !== json.customer!.id)]);
-      setSuccess(copy.customerSaved);
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : copy.unknownError);
-    }
+    setCustomer(emptyCustomer());
+    setItems([makeLineItem(defaults.vatRegistered)]);
+    setRotRut(null);
   };
 
   const onCreateInvoice = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     setError(null);
-    setSuccess(null);
+    setLastSaved(null);
 
     try {
       const response = await fetch("/api/invoices", {
@@ -476,11 +385,10 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
           description: description.trim() || undefined,
           notes: notes.trim() || undefined,
           issueDate,
-          dueDate: dueDate || undefined,
+          // Untouched means "use my payment terms": the server works out the date.
+          dueDate: dueDateTouched ? dueDate || undefined : undefined,
           currency,
-          paymentMethod: paymentMethod.trim() || undefined,
           paymentDetails: paymentDetails.trim() || undefined,
-          emailTo: emailTo.trim() || undefined,
           logoDataUrl: logoDataUrl || undefined,
           signatureDataUrl: signatureDataUrl || undefined,
           sender: {
@@ -491,25 +399,9 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
             phone: senderPhone.trim() || undefined,
             website: senderWebsite.trim() || undefined
           },
-          customer: {
-            id: customer.id || undefined,
-            name: customer.name.trim(),
-            email: customer.email.trim() || undefined,
-            phone: customer.phone.trim() || undefined,
-            website: customer.website.trim() || undefined,
-            addressLine1: customer.addressLine1.trim() || undefined,
-            addressLine2: customer.addressLine2.trim() || undefined,
-            city: customer.city.trim() || undefined,
-            postalCode: customer.postalCode.trim() || undefined,
-            country: customer.country.trim() || undefined
-          },
-          items: items.map((item) => ({
-            description: item.description,
-            quantity: toNumber(item.quantity || "0"),
-            unitPrice: toNumber(item.unitPrice || "0"),
-            vatMode: item.vatMode,
-            vatRate: normalizeVatRate(toNumber(item.vatRate || "0"))
-          }))
+          customer: customerPayload(customer),
+          items: rotRutAllowed && rotRut ? draftsToRotRutItems(items, rotRut.type) : draftsToItems(items),
+          rotRut: rotRutAllowed && rotRut ? rotRutPayload(rotRut) : undefined
         })
       });
 
@@ -517,6 +409,15 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
         error?: string;
         invoice?: {
           id: string;
+          invoiceNumber: string;
+          customerName: string;
+          customerEmail: string | null;
+          issueDate: string;
+          dueDate: string | null;
+          grossAmount: number;
+          currency: string;
+          rotRutType: "ROT" | "RUT" | null;
+          rotRutDeduction: number | null;
         };
       };
 
@@ -524,8 +425,30 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
         throw new Error(json.error ?? copy.createFailed);
       }
 
-      setLastSavedInvoiceId(json.invoice.id);
-      setSuccess(copy.invoiceSaved);
+      setLastSaved({
+        id: json.invoice.id,
+        invoiceNumber: json.invoice.invoiceNumber,
+        customerName: json.invoice.customerName,
+        customerEmail: json.invoice.customerEmail,
+        currency: json.invoice.currency,
+        grossAmount: json.invoice.grossAmount,
+        paidAmount: 0,
+        creditedAmount: 0,
+        remaining: Math.round((json.invoice.grossAmount - (json.invoice.rotRutDeduction ?? 0)) * 100) / 100,
+        rotRut: json.invoice.rotRutType
+          ? {
+              type: json.invoice.rotRutType,
+              skatteverketAmount: json.invoice.rotRutDeduction ?? 0,
+              received: 0,
+              stage: "awaiting_customer"
+            }
+          : null,
+        statusKind: "DRAFT" satisfies InvoiceStatusKind,
+        overdue: false,
+        issueDate: json.invoice.issueDate,
+        dueDate: json.invoice.dueDate,
+        reminderCount: 0
+      });
       resetDraft();
       router.refresh();
     } catch (createError) {
@@ -535,82 +458,199 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
     }
   };
 
-  const onMarkPaid = async (invoiceId: string) => {
-    const paymentDate = window.prompt(copy.paymentDatePrompt, todayIso());
-    if (!paymentDate) return;
-
-    setPayingId(invoiceId);
-    setError(null);
-    setSuccess(null);
-    try {
-      const response = await fetch(`/api/invoices/${invoiceId}/pay`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentDate })
-      });
-      const json = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(json.error ?? copy.payFailed);
-      }
-      router.refresh();
-    } catch (payError) {
-      setError(payError instanceof Error ? payError.message : copy.unknownError);
-    } finally {
-      setPayingId(null);
-    }
-  };
-
-  const onEmailInvoice = async (invoiceId: string, preferredEmail: string | null) => {
-    const to = window.prompt(copy.emailPrompt, preferredEmail ?? emailTo ?? "");
-    if (!to) return;
-
-    setEmailingId(invoiceId);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const response = await fetch(`/api/invoices/${invoiceId}/email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to })
-      });
-      const json = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(json.error ?? copy.emailFailed);
-      }
-      setSuccess(copy.emailed);
-      router.refresh();
-    } catch (emailError) {
-      setError(emailError instanceof Error ? emailError.message : copy.unknownError);
-    } finally {
-      setEmailingId(null);
-    }
-  };
-
-  const onImageSelect = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-    setter: (value: string) => void
-  ) => {
-    const file = event.currentTarget.files?.[0];
+  const onImageSelect = async (event: React.ChangeEvent<HTMLInputElement>, setter: (value: string) => void) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
     try {
-      const dataUrl = await readFileAsDataUrl(file);
-      setter(dataUrl);
+      setter(await readFileAsDataUrl(file));
     } catch (imageError) {
       setError(imageError instanceof Error ? imageError.message : copy.unknownError);
     } finally {
-      event.currentTarget.value = "";
+      input.value = "";
     }
   };
 
   return (
     <div className="stack">
+      <div className="grid">
+        <article className="card">
+          <p className="label">{copy.outstanding}</p>
+          <p className="kpi">{formatMoney(totals.outstanding, totals.currency, numberLocale)}</p>
+        </article>
+        <article className="card">
+          <p className="label">{copy.overdue}</p>
+          <p className="kpi">{formatMoney(totals.overdue, totals.currency, numberLocale)}</p>
+          {totals.overdueCount > 0 && (
+            <p className="note">
+              {copy.overdueCount(totals.overdueCount)}.{" "}
+              <Link className="textLink" href="/invoices?show=overdue#invoice-list">
+                {copy.seeOverdue}
+              </Link>
+            </p>
+          )}
+        </article>
+        <article className="card">
+          <div className="stack">
+            <Link className="textLink" href="/customers">
+              {copy.customers}
+            </Link>
+            <Link className="textLink" href="/quotes">
+              {copy.quotes}
+            </Link>
+          </div>
+        </article>
+      </div>
+
+      {afterSummary}
+
       <section className="invoiceWorkspace" id="new-invoice">
         <form className="invoiceBuilder card" onSubmit={onCreateInvoice}>
           <h2>{copy.createTitle}</h2>
-          <p className="note">{copy.notSavedYet}</p>
+          <p className="note">{copy.createIntro}</p>
 
           <details open>
+            <summary>{copy.customerSection}</summary>
+            <div className="invoiceSectionBody">
+              <CustomerPicker locale={locale} value={customer} onChange={setCustomer} options={customers} />
+            </div>
+          </details>
+
+          <details open>
+            <summary>{copy.itemsSection}</summary>
+            <div className="invoiceSectionBody">
+              <LineItemsEditor
+                locale={locale}
+                items={items}
+                onChange={setItems}
+                currency={currency}
+                vatRegistered={defaults.vatRegistered}
+                rotRut={rotRutType ? { type: rotRutType } : undefined}
+              />
+            </div>
+          </details>
+
+          {defaults.fSkattRegistered && (
+            <details open>
+              <summary>{copy.rotRutSection}</summary>
+              <div className="invoiceSectionBody">
+                <RotRutForm
+                  locale={locale}
+                  value={rotRutAllowed ? rotRut : null}
+                  onChange={setRotRut}
+                  fSkatt={defaults.fSkattRegistered}
+                  accrual={defaults.accrual}
+                  currency={currency}
+                  issueDate={issueDate}
+                  dueDate={effectiveDueDate}
+                  items={items}
+                />
+              </div>
+            </details>
+          )}
+
+          <details open>
+            <summary>{copy.detailsSection}</summary>
+            <div className="stack invoiceSectionBody">
+              <div className="row">
+                <label className="stack">
+                  {copy.issueDate}
+                  <input type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} required />
+                </label>
+                <label className="stack">
+                  {copy.dueDate}
+                  <input
+                    type="date"
+                    value={effectiveDueDate}
+                    min={issueDate}
+                    onChange={(event) => {
+                      setDueDateTouched(true);
+                      setDueDate(event.target.value);
+                    }}
+                    required
+                  />
+                </label>
+              </div>
+              <p className="note">{copy.dueHint(defaults.paymentTermsDays)}</p>
+              <div className="row">
+                <label className="stack">
+                  {copy.invoiceNumber}
+                  <input
+                    value={effectiveInvoiceNumber}
+                    onChange={(event) => {
+                      setInvoiceNumberTouched(true);
+                      setInvoiceNumber(event.target.value);
+                    }}
+                    required
+                  />
+                </label>
+                <label className="stack">
+                  {copy.currency}
+                  <select value={currency} onChange={(event) => setCurrency(event.target.value)}>
+                    <option value="SEK">SEK</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                  </select>
+                </label>
+              </div>
+              {invoiceNumberTouched && (
+                <div className="row">
+                  <button type="button" className="secondary" onClick={() => setInvoiceNumberTouched(false)}>
+                    {copy.usePatternNumber}
+                  </button>
+                </div>
+              )}
+              <label className="stack">
+                {copy.project}
+                <input value={projectName} onChange={(event) => setProjectName(event.target.value)} maxLength={180} />
+              </label>
+            </div>
+          </details>
+
+          <details open={defaults.paymentLines.length === 0 || undefined}>
+            <summary>{copy.paymentSection}</summary>
+            <div className="stack invoiceSectionBody">
+              {defaults.paymentLines.length > 0 ? (
+                <>
+                  <p className="note">{copy.paymentAuto}</p>
+                  <p>
+                    {defaults.paymentLines.map((line) => (
+                      <span key={line.label} style={{ display: "block" }}>
+                        {line.label}: <strong>{line.value}</strong>
+                      </span>
+                    ))}
+                  </p>
+                </>
+              ) : (
+                <p className="note">
+                  {copy.paymentMissing}{" "}
+                  <Link className="textLink" href="/settings#invoice-payment">
+                    {copy.paymentSettings}
+                  </Link>
+                </p>
+              )}
+              <label className="stack">
+                {copy.paymentExtra}
+                <textarea rows={2} value={paymentDetails} onChange={(event) => setPaymentDetails(event.target.value)} />
+              </label>
+            </div>
+          </details>
+
+          <details>
+            <summary>{copy.notesSection}</summary>
+            <div className="stack invoiceSectionBody">
+              <label className="stack">
+                {copy.notes}
+                <textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={2000} />
+              </label>
+              <label className="stack">
+                {copy.bookDescription}
+                <input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={240} />
+              </label>
+            </div>
+          </details>
+
+          <details>
             <summary>{copy.myDetails}</summary>
             <div className="stack invoiceSectionBody">
               <label className="stack">
@@ -644,300 +684,8 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
             </div>
           </details>
 
-          <details open>
-            <summary>{copy.clientDetails}</summary>
-            <div className="stack invoiceSectionBody">
-              <label className="stack">
-                {copy.customerName}
-                <input
-                  value={customer.name}
-                  onChange={(event) =>
-                    setCustomer((current) => ({ ...current, id: undefined, name: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-
-              {customerSuggestions.length > 0 && customer.name.trim().length > 0 && (
-                <div className="invoiceCustomerSuggestions">
-                  {customerSuggestions.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className="invoiceCustomerOption"
-                      onClick={() =>
-                        setCustomer({
-                          id: option.id,
-                          name: option.name,
-                          email: option.email ?? "",
-                          phone: option.phone ?? "",
-                          website: option.website ?? "",
-                          addressLine1: option.addressLine1 ?? "",
-                          addressLine2: option.addressLine2 ?? "",
-                          city: option.city ?? "",
-                          postalCode: option.postalCode ?? "",
-                          country: option.country ?? ""
-                        })
-                      }
-                    >
-                      <strong>{option.name}</strong>
-                      <span>{option.email ?? "-"}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="row">
-                <label className="stack">
-                  {copy.customerEmail}
-                  <input
-                    type="email"
-                    value={customer.email}
-                    onChange={(event) => setCustomer((current) => ({ ...current, email: event.target.value }))}
-                  />
-                </label>
-                <label className="stack">
-                  {copy.customerPhone}
-                  <input
-                    value={customer.phone}
-                    onChange={(event) => setCustomer((current) => ({ ...current, phone: event.target.value }))}
-                  />
-                </label>
-              </div>
-              <div className="row">
-                <label className="stack">
-                  {copy.customerWebsite}
-                  <input
-                    value={customer.website}
-                    onChange={(event) => setCustomer((current) => ({ ...current, website: event.target.value }))}
-                  />
-                </label>
-              </div>
-              <label className="stack">
-                {copy.customerAddress1}
-                <input
-                  value={customer.addressLine1}
-                  onChange={(event) =>
-                    setCustomer((current) => ({ ...current, addressLine1: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="stack">
-                {copy.customerAddress2}
-                <input
-                  value={customer.addressLine2}
-                  onChange={(event) =>
-                    setCustomer((current) => ({ ...current, addressLine2: event.target.value }))
-                  }
-                />
-              </label>
-              <div className="row">
-                <label className="stack">
-                  {copy.customerPostal}
-                  <input
-                    value={customer.postalCode}
-                    onChange={(event) =>
-                      setCustomer((current) => ({ ...current, postalCode: event.target.value }))
-                    }
-                  />
-                </label>
-                <label className="stack">
-                  {copy.customerCity}
-                  <input
-                    value={customer.city}
-                    onChange={(event) => setCustomer((current) => ({ ...current, city: event.target.value }))}
-                  />
-                </label>
-                <label className="stack">
-                  {copy.customerCountry}
-                  <input
-                    value={customer.country}
-                    onChange={(event) => setCustomer((current) => ({ ...current, country: event.target.value }))}
-                  />
-                </label>
-              </div>
-              <div className="row">
-                <button type="button" className="secondary" onClick={onSaveCustomer}>
-                  {copy.saveCustomer}
-                </button>
-              </div>
-            </div>
-          </details>
-
-          <details open>
-            <summary>{copy.itemsTitle}</summary>
-            <div className="stack invoiceSectionBody">
-              <div className="row">
-                <label className="stack">
-                  {copy.invoiceNumber}
-                  <input
-                    value={effectiveInvoiceNumber}
-                    onChange={(event) => {
-                      setInvoiceNumberTouched(true);
-                      setInvoiceNumber(event.target.value);
-                    }}
-                    required
-                  />
-                </label>
-                <label className="stack">
-                  {copy.project}
-                  <input value={projectName} onChange={(event) => setProjectName(event.target.value)} />
-                </label>
-              </div>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  setInvoiceNumberTouched(false);
-                  setInvoiceNumber(suggestedInvoiceNumber);
-                }}
-              >
-                {copy.usePatternNumber}
-              </button>
-              <div className="row">
-                <label className="stack">
-                  {copy.issueDate}
-                  <input
-                    type="date"
-                    value={issueDate}
-                    onChange={(event) => setIssueDate(event.target.value)}
-                    required
-                  />
-                </label>
-                <label className="stack">
-                  {copy.dueDate}
-                  <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
-                </label>
-                <label className="stack">
-                  {copy.currency}
-                  <select value={currency} onChange={(event) => setCurrency(event.target.value)}>
-                    <option value="SEK">SEK</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                  </select>
-                </label>
-              </div>
-
-              {items.map((item) => (
-                <div key={item.key} className="invoiceItemCard">
-                  <div className="row">
-                    <label className="stack" style={{ flex: 1 }}>
-                      {copy.description}
-                      <input
-                        value={item.description}
-                        onChange={(event) => updateItem(item.key, { description: event.target.value })}
-                        required
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => setItems((current) => current.filter((row) => row.key !== item.key))}
-                      disabled={items.length <= 1}
-                    >
-                      {copy.remove}
-                    </button>
-                  </div>
-                  <div className="row">
-                    <label className="stack">
-                      {copy.units}
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        value={item.quantity}
-                        onChange={(event) => updateItem(item.key, { quantity: event.target.value })}
-                        required
-                      />
-                    </label>
-                    <label className="stack">
-                      {copy.price}
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.unitPrice}
-                        onChange={(event) => updateItem(item.key, { unitPrice: event.target.value })}
-                        required
-                      />
-                    </label>
-                    <label className="stack">
-                      {copy.vatRate}
-                      <input
-                        type="number"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={item.vatRate}
-                        onChange={(event) => updateItem(item.key, { vatRate: event.target.value })}
-                      />
-                    </label>
-                  </div>
-                  <div className="row">
-                    <label>
-                      <input
-                        type="radio"
-                        checked={item.vatMode === InvoiceVatModes.NO_VAT}
-                        onChange={() => updateItem(item.key, { vatMode: InvoiceVatModes.NO_VAT })}
-                      />{" "}
-                      {copy.noVat}
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        checked={item.vatMode === InvoiceVatModes.INCLUSIVE}
-                        onChange={() => updateItem(item.key, { vatMode: InvoiceVatModes.INCLUSIVE })}
-                      />{" "}
-                      {copy.vatInc}
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        checked={item.vatMode === InvoiceVatModes.EXCLUSIVE}
-                        onChange={() => updateItem(item.key, { vatMode: InvoiceVatModes.EXCLUSIVE })}
-                      />{" "}
-                      {copy.vatEx}
-                    </label>
-                  </div>
-                </div>
-              ))}
-
-              <button type="button" className="secondary" onClick={() => setItems((current) => [...current, makeItem()])}>
-                {copy.addItem}
-              </button>
-            </div>
-          </details>
-
           <details>
-            <summary>{copy.paymentDetails}</summary>
-            <div className="stack invoiceSectionBody">
-              <label className="stack">
-                {copy.paymentMethod}
-                <input value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} />
-              </label>
-              <label className="stack">
-                {copy.paymentInfo}
-                <textarea rows={4} value={paymentDetails} onChange={(event) => setPaymentDetails(event.target.value)} />
-              </label>
-            </div>
-          </details>
-
-          <details>
-            <summary>{copy.addNotes}</summary>
-            <div className="stack invoiceSectionBody">
-              <label className="stack">
-                {copy.notes}
-                <textarea rows={4} value={notes} onChange={(event) => setNotes(event.target.value)} />
-              </label>
-              <label className="stack">
-                {copy.description}
-                <input value={description} onChange={(event) => setDescription(event.target.value)} />
-              </label>
-            </div>
-          </details>
-
-          <details>
-            <summary>{copy.addSignature}</summary>
+            <summary>{copy.brandingSection}</summary>
             <div className="stack invoiceSectionBody">
               <label className="stack">
                 {copy.logo}
@@ -945,7 +693,7 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
                 {logoDataUrl && (
                   <div className="row">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={logoDataUrl} alt="Invoice logo" style={{ maxHeight: 38 }} />
+                    <img src={logoDataUrl} alt="" style={{ maxHeight: 38 }} />
                     <button type="button" className="secondary" onClick={() => setLogoDataUrl("")}>
                       {copy.clearImage}
                     </button>
@@ -958,7 +706,7 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
                 {signatureDataUrl && (
                   <div className="row">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={signatureDataUrl} alt="Invoice signature" style={{ maxHeight: 38 }} />
+                    <img src={signatureDataUrl} alt="" style={{ maxHeight: 38 }} />
                     <button type="button" className="secondary" onClick={() => setSignatureDataUrl("")}>
                       {copy.clearImage}
                     </button>
@@ -968,73 +716,57 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
             </div>
           </details>
 
-          <details>
-            <summary>{copy.emailDetails}</summary>
-            <div className="stack invoiceSectionBody">
-              <label className="stack">
-                {copy.emailTo}
-                <input type="email" value={emailTo} onChange={(event) => setEmailTo(event.target.value)} />
-              </label>
+          <p>
+            {reduction ? copy.rotRutCustomerPays : copy.total}:{" "}
+            <strong>{formatMoney(customerPays, currency, numberLocale)}</strong>
+          </p>
+          <div className="row">
+            <button type="submit" disabled={saving}>
+              {saving ? copy.savingInvoice : copy.saveInvoice}
+            </button>
+          </div>
+          {error && <p className="error">{error}</p>}
+          {lastSaved && (
+            <div className="stack">
+              <p className="success">{copy.invoiceSaved(lastSaved.invoiceNumber)}</p>
+              <InvoiceActions locale={locale} invoice={lastSaved} variant="row" />
             </div>
-          </details>
-
-          <button type="submit" disabled={saving}>
-            {saving ? copy.savingInvoice : copy.saveInvoice}
-          </button>
+          )}
         </form>
 
         <aside className="invoicePreview card">
           <div className="invoicePreviewActions">
             <h2>{copy.previewTitle}</h2>
-            <div className="row">
-              {lastSavedInvoiceId ? (
-                <>
-                  <a className="button secondary" href={`/api/invoices/${lastSavedInvoiceId}/pdf`}>
-                    {copy.savePdf}
-                  </a>
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => onEmailInvoice(lastSavedInvoiceId, emailTo || customer.email || null)}
-                    disabled={emailingId === lastSavedInvoiceId}
-                  >
-                    {emailingId === lastSavedInvoiceId ? copy.emailing : copy.emailPdf}
-                  </button>
-                </>
-              ) : (
-                <span className="note">{copy.notSavedYet}</span>
-              )}
-            </div>
           </div>
 
           <div className="invoicePaper">
             <div className="invoicePaperHeader">
               <div>
-                <h3>Invoice</h3>
-                <p>#{effectiveInvoiceNumber || "-"}</p>
+                <h3>{copy.invoiceWord}</h3>
+                <p>{effectiveInvoiceNumber || "-"}</p>
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {logoDataUrl ? <img className="invoiceLogo" src={logoDataUrl} alt="Invoice logo" /> : null}
+              {logoDataUrl ? <img className="invoiceLogo" src={logoDataUrl} alt="" /> : null}
             </div>
 
             <div className="invoiceMetaGrid">
-              <div>
-                <p className="label">{copy.project}</p>
-                <p>{projectName || "-"}</p>
-              </div>
               <div>
                 <p className="label">{copy.issueDate}</p>
                 <p>{issueDate || "-"}</p>
               </div>
               <div>
                 <p className="label">{copy.dueDate}</p>
-                <p>{dueDate || "-"}</p>
+                <p>{effectiveDueDate || "-"}</p>
+              </div>
+              <div>
+                <p className="label">{copy.project}</p>
+                <p>{projectName || "-"}</p>
               </div>
             </div>
 
             <div className="invoicePartyGrid">
               <div>
-                <p className="label">From</p>
+                <p className="label">{copy.from}</p>
                 <p>
                   <strong>{senderName || defaults.businessName}</strong>
                 </p>
@@ -1042,17 +774,14 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
                 {senderOrg && <p>{senderOrg}</p>}
                 {senderEmail && <p>{senderEmail}</p>}
                 {senderPhone && <p>{senderPhone}</p>}
-                {senderWebsite && <p>{senderWebsite}</p>}
               </div>
               <div>
-                <p className="label">To</p>
+                <p className="label">{copy.to}</p>
                 <p>
                   <strong>{customer.name || "-"}</strong>
                 </p>
                 {customerAddressPreview && <p>{customerAddressPreview}</p>}
                 {customer.email && <p>{customer.email}</p>}
-                {customer.phone && <p>{customer.phone}</p>}
-                {customer.website && <p>{customer.website}</p>}
               </div>
             </div>
 
@@ -1062,17 +791,15 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
                   <tr>
                     <th>{copy.description}</th>
                     <th>{copy.units}</th>
-                    <th>{copy.price}</th>
                     <th>{copy.vatAmount}</th>
                     <th>{copy.total}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {computed.items.map((item) => (
-                    <tr key={item.description + item.quantity + item.unitPrice}>
+                  {computed.items.map((item, index) => (
+                    <tr key={`${index}-${item.description}`}>
                       <td>{item.description}</td>
                       <td>{item.quantity}</td>
-                      <td>{formatMoney(item.unitPrice, currency, numberLocale)}</td>
                       <td>{formatMoney(item.vatAmount, currency, numberLocale)}</td>
                       <td>{formatMoney(item.totalAmount, currency, numberLocale)}</td>
                     </tr>
@@ -1089,36 +816,66 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
                 {copy.vatAmount}: <strong>{formatMoney(computed.vatAmount, currency, numberLocale)}</strong>
               </p>
               <p>
-                {copy.total}: <strong>{formatMoney(computed.grossAmount, currency, numberLocale)}</strong>
+                {reduction ? copy.totalInclVat : copy.total}:{" "}
+                <strong>{formatMoney(computed.grossAmount, currency, numberLocale)}</strong>
               </p>
+              {reduction && (
+                <>
+                  <p>
+                    {copy.rotRutLabour}: <strong>{formatMoney(reduction.labourAmount, currency, numberLocale)}</strong>
+                  </p>
+                  <p>
+                    {copy.rotRutReduction(rotRutWord, Math.round(reduction.rate * 100))}:{" "}
+                    <strong>{formatMoney(-reduction.deduction, currency, numberLocale)}</strong>
+                  </p>
+                  <p>
+                    {copy.total}: <strong>{formatMoney(customerPays, currency, numberLocale)}</strong>
+                  </p>
+                </>
+              )}
             </div>
 
             {notes && <p className="invoiceNote">{notes}</p>}
 
-            {(paymentMethod || paymentDetails) && (
-              <div className="invoicePayment">
-                <h4>{copy.paymentMethod}</h4>
-                <p>{paymentMethod || "-"}</p>
-                {paymentDetails && <p>{paymentDetails}</p>}
-              </div>
-            )}
+            <div className="invoicePayment">
+              <h4>{copy.paymentSection}</h4>
+              <p>
+                {copy.total}: <strong>{formatMoney(customerPays, currency, numberLocale)}</strong>
+                {effectiveDueDate ? `, ${copy.dueDate.toLowerCase()} ${effectiveDueDate}` : ""}
+              </p>
+              {reduction && (
+                <p className="note">{copy.rotRutPreviewNote(formatMoney(reduction.deduction, currency, numberLocale))}</p>
+              )}
+              {defaults.paymentLines.map((line) => (
+                <p key={line.label}>
+                  {line.label}: {line.value}
+                </p>
+              ))}
+              <p className="note">{copy.ocrAuto}</p>
+              {paymentDetails && <p>{paymentDetails}</p>}
+            </div>
 
             {signatureDataUrl && (
               <div className="invoiceSignatureRow">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="invoiceSignature" src={signatureDataUrl} alt="Invoice signature" />
+                <img className="invoiceSignature" src={signatureDataUrl} alt="" />
               </div>
             )}
           </div>
         </aside>
       </section>
 
-      {error && <p className="error">{error}</p>}
-      {success && <p className="success">{success}</p>}
-
       <article className="card" id="invoice-filters">
-        <h2>{copy.filterTitle}</h2>
-        <form className="row" method="get">
+        <form className="row" method="get" style={{ alignItems: "flex-end" }}>
+          <label className="stack">
+            {copy.show}
+            <select name="show" defaultValue={filters.show}>
+              <option value="period">{copy.showPeriod}</option>
+              <option value="open">{copy.showOpen}</option>
+              <option value="overdue">{copy.showOverdue}</option>
+            </select>
+          </label>
+
           <label className="stack">
             {copy.year}
             <select name="year" defaultValue={String(filters.year)}>
@@ -1142,91 +899,80 @@ export const InvoicesManager = ({ locale, rows, customers, defaults, filters }: 
             </select>
           </label>
 
-          <label className="stack" style={{ minWidth: 260 }}>
+          <label className="stack" style={{ minWidth: 240 }}>
             {copy.search}
             <input name="q" defaultValue={filters.query} placeholder={copy.searchPlaceholder} />
           </label>
 
-          <div className="row" style={{ alignItems: "end" }}>
-            <button type="submit">{copy.filter}</button>
-          </div>
+          <button type="submit">{copy.filter}</button>
         </form>
       </article>
 
       <article className="card" id="invoice-list">
-        <h2>{copy.invoiceListTitle}</h2>
-        <div className="tableWrap">
-          <table>
-            <thead>
-              <tr>
-                <th>{copy.invoiceNumber}</th>
-                <th>{copy.customerName}</th>
-                <th>{copy.issueDate}</th>
-                <th>{copy.dueDate}</th>
-                <th>{copy.total}</th>
-                <th>{copy.status}</th>
-                <th>{copy.paidDate}</th>
-                <th>{copy.sentDate}</th>
-                <th>{copy.action}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((invoice) => (
-                <tr key={invoice.id}>
-                  <td>{invoice.invoiceNumber}</td>
-                  <td>{invoice.customerName}</td>
-                  <td>{invoice.issueDate.slice(0, 10)}</td>
-                  <td>{invoice.dueDate ? invoice.dueDate.slice(0, 10) : "-"}</td>
-                  <td>{formatMoney(invoice.grossAmount, invoice.currency, numberLocale)}</td>
-                  <td>
-                    <span className={invoice.status === "PAID" ? "badge good" : "badge warn"}>
-                      {invoice.status === "PAID" ? copy.paid : copy.unpaid}
-                    </span>
-                  </td>
-                  <td>{invoice.paidAt ? invoice.paidAt.slice(0, 10) : "-"}</td>
-                  <td>{invoice.sentAt ? invoice.sentAt.slice(0, 10) : "-"}</td>
-                  <td>
-                    <div className="row">
-                      <a className="button secondary" href={`/api/invoices/${invoice.id}/pdf`}>
-                        {copy.downloadPdf}
-                      </a>
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => onEmailInvoice(invoice.id, invoice.customerEmail)}
-                        disabled={emailingId === invoice.id}
-                      >
-                        {emailingId === invoice.id ? copy.emailing : copy.emailPdf}
-                      </button>
-                      {invoice.status === "PAID" ? (
-                        invoice.paidTransactionId ? (
-                          <Link href={`/review/transactions/${invoice.paidTransactionId}`}>{copy.reviewPayment}</Link>
-                        ) : (
-                          "-"
-                        )
-                      ) : (
-                        <button
-                          type="button"
-                          className="secondary"
-                          disabled={payingId === invoice.id}
-                          onClick={() => onMarkPaid(invoice.id)}
-                        >
-                          {payingId === invoice.id ? copy.markingPaid : copy.markPaid}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 && (
+        <h2>{copy.listTitle}</h2>
+        {rows.length === 0 ? (
+          <p className="note">
+            {copy.noInvoices} {filters.show === "period" && !filters.query ? copy.noInvoicesHint : ""}
+          </p>
+        ) : (
+          <div className="tableWrap">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={9}>{copy.noInvoices}</td>
+                  <th>{copy.invoiceNumber}</th>
+                  <th>{copy.customer}</th>
+                  <th>{copy.dueDate}</th>
+                  <th>{copy.amount}</th>
+                  <th>{copy.remaining}</th>
+                  <th>{copy.status}</th>
+                  <th>{copy.nextStep}</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((invoice) => (
+                  <tr key={invoice.id}>
+                    <td>
+                      <Link className="textLink" href={`/invoices/${invoice.id}`}>
+                        {invoice.invoiceNumber}
+                      </Link>
+                      <br />
+                      <span className="note">{invoice.issueDate.slice(0, 10)}</span>
+                    </td>
+                    <td>
+                      {invoice.customerId ? (
+                        <Link className="textLink" href={`/customers/${invoice.customerId}`}>
+                          {invoice.customerName}
+                        </Link>
+                      ) : (
+                        invoice.customerName
+                      )}
+                    </td>
+                    <td>{invoice.dueDate ? invoice.dueDate.slice(0, 10) : "-"}</td>
+                    <td>{formatMoney(invoice.grossAmount, invoice.currency, numberLocale)}</td>
+                    <td>
+                      <strong>{formatMoney(invoice.remaining, invoice.currency, numberLocale)}</strong>
+                    </td>
+                    <td>
+                      <span className={`badge ${invoice.statusTone}`.trim()}>{invoice.statusLabel}</span>
+                      {invoice.rotRut && invoice.rotRut.stage && invoice.rotRut.stage !== "cancelled" && (
+                        <>
+                          <br />
+                          <span className="note">{copy.rotRutStage(invoice.rotRut.type, invoice.rotRut.stage)}</span>
+                        </>
+                      )}
+                    </td>
+                    <td>
+                      <InvoiceActions locale={locale} invoice={invoice} variant="row" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </article>
+
+      <RecurringList locale={locale} rows={recurring} />
     </div>
   );
 };

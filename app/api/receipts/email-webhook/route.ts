@@ -6,7 +6,6 @@ import { NextResponse } from "next/server";
 
 import { createCashMethodTransaction } from "@/lib/accounting/posting";
 import { asNumber, round2 } from "@/lib/accounting/math";
-import { requireAuthContext } from "@/lib/auth/context";
 import { requireBusiness } from "@/lib/data/business";
 import { supportsReceiptItemPurchasedField } from "@/lib/data/receiptItemSupport";
 import { prisma } from "@/lib/db";
@@ -24,6 +23,9 @@ type InboundAttachment = {
 
 type InboundPayload = {
   Subject?: string;
+  To?: string;
+  OriginalRecipient?: string;
+  MailboxHash?: string;
   Attachments?: InboundAttachment[];
 };
 
@@ -52,7 +54,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No attachment in email payload." }, { status: 400 });
   }
 
-  const { businessId } = await requireAuthContext();
+  // A webhook has no session. The business is identified by the secret token in
+  // its receipt inbox address: receipts+<token>@<inbound domain>.
+  const inboxToken =
+    payload.MailboxHash?.trim() ||
+    /\+([A-Za-z0-9_-]{16,})@/.exec(payload.OriginalRecipient ?? payload.To ?? "")?.[1];
+  if (!inboxToken) {
+    return NextResponse.json({ error: "No receipt inbox token in the recipient address." }, { status: 400 });
+  }
+  const owner = await prisma.business.findUnique({
+    where: { receiptInboxToken: inboxToken },
+    select: { id: true }
+  });
+  if (!owner) {
+    return NextResponse.json({ error: "Unknown receipt inbox." }, { status: 404 });
+  }
+  const businessId = owner.id;
   const business = await requireBusiness(businessId);
   const canUseItemPurchased = await supportsReceiptItemPurchasedField();
   const fileBuffer = Buffer.from(attachment.Content, "base64");
@@ -169,8 +186,9 @@ export async function POST(request: Request) {
     }
   });
 
+  // Booked only when the extraction is trusted; otherwise on approval in review.
   let transaction = null;
-  if (postingGrossAmount !== undefined && postingGrossAmount > 0) {
+  if (!extracted.needsReview && postingGrossAmount !== undefined && postingGrossAmount > 0) {
     const direction = TransactionDirections.EXPENSE;
 
     transaction = await createCashMethodTransaction({

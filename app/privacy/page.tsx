@@ -91,6 +91,8 @@ export default async function PrivacyPage() {
             <ul>
               <li><strong>akunta_session</strong> – nödvändig inloggningstoken (httpOnly, 30 dagar)</li>
               <li><strong>akunta_auth</strong> – inloggningsindikator för UI (30 dagar)</li>
+              <li><strong>akunta_access</strong> – nödvändig, anger din behörighet i den aktuella bokföringen (httpOnly, 10 minuter)</li>
+              <li><strong>akunta_business</strong> – nödvändig, minns vilket företag du senast arbetade i (1 år)</li>
               <li><strong>locale</strong> – språkinställning (1 år)</li>
               <li><strong>cookie_consent</strong> – ditt cookiesamtycke (1 år)</li>
             </ul>
@@ -189,6 +191,8 @@ export default async function PrivacyPage() {
           <ul>
             <li><strong>akunta_session</strong>: essential login token (httpOnly, 30 days)</li>
             <li><strong>akunta_auth</strong>: login UI indicator (30 days)</li>
+            <li><strong>akunta_access</strong>: essential, your access level in the current books (httpOnly, 10 minutes)</li>
+            <li><strong>akunta_business</strong>: essential, remembers which business you last worked in (1 year)</li>
             <li><strong>locale</strong>: language preference (1 year)</li>
             <li><strong>cookie_consent</strong>: your cookie consent choice (1 year)</li>
           </ul>

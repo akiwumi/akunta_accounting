@@ -21,7 +21,10 @@ export const EntrySources = {
   BANK_IMPORT: "BANK_IMPORT",
   MANUAL: "MANUAL",
   EMAIL: "EMAIL",
-  INVOICE_PAYMENT: "INVOICE_PAYMENT"
+  INVOICE_PAYMENT: "INVOICE_PAYMENT",
+  CORRECTION: "CORRECTION",
+  SIE_IMPORT: "SIE_IMPORT",
+  JOURNAL: "JOURNAL"
 } as const;
 
 export type EntrySource = (typeof EntrySources)[keyof typeof EntrySources];

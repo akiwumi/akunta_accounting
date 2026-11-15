@@ -70,22 +70,6 @@ export async function getAccountBalances(
   upToDate: Date,
   fiscalYear?: number
 ): Promise<AccountBalance[]> {
-  const accounts = await prisma.account.findMany({
-    where: { businessId },
-    include: {
-      lines: {
-        where: {
-          transaction: {
-            businessId,
-            txnDate: { lte: upToDate },
-          },
-        },
-        select: { debit: true, credit: true },
-      },
-    },
-    orderBy: { code: "asc" },
-  });
-
   // Load opening balances for the fiscal year if provided
   const openingMap = new Map<string, number>();
   if (fiscalYear !== undefined) {
@@ -96,6 +80,27 @@ export async function getAccountBalances(
       openingMap.set(ob.accountId, toNumber(ob.amount));
     }
   }
+
+  // Opening balances already contain everything booked before the fiscal year,
+  // so when they exist only this year's lines may be added on top.
+  const fromDate =
+    fiscalYear !== undefined && openingMap.size > 0 ? new Date(Date.UTC(fiscalYear, 0, 1)) : undefined;
+
+  const accounts = await prisma.account.findMany({
+    where: { businessId },
+    include: {
+      lines: {
+        where: {
+          transaction: {
+            businessId,
+            txnDate: { lte: upToDate, ...(fromDate ? { gte: fromDate } : {}) },
+          },
+        },
+        select: { debit: true, credit: true },
+      },
+    },
+    orderBy: { code: "asc" },
+  });
 
   return accounts.map((acc) => {
     const totalDebit = acc.lines.reduce((s, l) => s + toNumber(l.debit), 0);
@@ -174,24 +179,26 @@ export async function upsertOpeningBalance(
 export async function closeFiscalYear(
   businessId: string,
   fiscalYear: number,
-  retainedEarningsAccountCode = "2010"
+  retainedEarningsAccountCode = "2010",
+  userId?: string | null
 ): Promise<YearEndSummary> {
   const yearStart = new Date(Date.UTC(fiscalYear, 0, 1));
   const yearEnd = new Date(Date.UTC(fiscalYear, 11, 31, 23, 59, 59, 999));
   const nextYearStart = fiscalYear + 1;
 
-  // ── Guard: existing period lock ───────────────────────────────────────────
+  // ── Guard: the year must not already be closed ────────────────────────────
+  // Only a lock covering the whole year means "closed". Shorter locks inside
+  // the year (a month or quarter locked after a VAT return) are expected and
+  // do not stand in the way.
   const existingLock = await prisma.periodLock.findFirst({
     where: {
       businessId,
-      periodStart: { lte: yearEnd },
-      periodEnd: { gte: yearStart },
+      periodStart: { lte: yearStart },
+      periodEnd: { gte: yearEnd },
     },
   });
   if (existingLock) {
-    throw new Error(
-      `A period lock already exists that overlaps with fiscal year ${fiscalYear}.`
-    );
+    throw new Error(`Fiscal year ${fiscalYear} is already closed.`);
   }
 
   // ── Guard: retained earnings account must exist ───────────────────────────
@@ -282,7 +289,20 @@ export async function closeFiscalYear(
 
     // Create period lock for the closed year
     await tx.periodLock.create({
-      data: { businessId, periodStart: yearStart, periodEnd: yearEnd },
+      data: { businessId, periodStart: yearStart, periodEnd: yearEnd, lockedByUserId: userId ?? undefined },
+    });
+
+    // Closing the books is the most consequential action in the app: the audit
+    // row is written in the same transaction so it cannot be lost.
+    await tx.auditLog.create({
+      data: {
+        businessId,
+        userId: userId ?? undefined,
+        entityType: "FiscalYear",
+        entityId: String(fiscalYear),
+        action: "CLOSE",
+        afterJson: JSON.stringify({ netPnl, openingBalances: openingRows.length, retainedEarningsAccountCode }),
+      },
     });
   });
 

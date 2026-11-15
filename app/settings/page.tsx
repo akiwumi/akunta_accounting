@@ -3,13 +3,19 @@ export const dynamic = "force-dynamic";
 import { SettingsForm } from "@/components/forms/SettingsForm";
 import { ChangePasswordForm } from "@/components/forms/ChangePasswordForm";
 import { SectionExportBar } from "@/components/layout/SectionExportBar";
+import { ReceiptInboxCard } from "@/components/settings/ReceiptInboxCard";
+import { TeamCard } from "@/components/team/TeamCard";
 import { asNumber } from "@/lib/accounting/math";
-import { ensureBusiness } from "@/lib/data/business";
+import { listPendingInvitations } from "@/lib/auth/invitations";
+import { listMembers } from "@/lib/auth/members";
+import { ensureBusiness, getBusinessAccess } from "@/lib/data/business";
 import { mergeBusinessWithLocalSettings, readLocalSettings } from "@/lib/data/localSettings";
 import { getFiscalYearStartMonth } from "@/lib/data/period";
 import { prisma } from "@/lib/db";
 import { type Jurisdiction } from "@/lib/domain/enums";
+import { isEmailConfigured } from "@/lib/email/send";
 import { getRequestLocale } from "@/lib/i18n/locale";
+import { isReceiptInboxConfigured, receiptInboxAddress } from "@/lib/receipts/inbox";
 
 export default async function SettingsPage() {
   const locale = await getRequestLocale();
@@ -32,6 +38,13 @@ export default async function SettingsPage() {
   if (!fresh) return null;
   const localSettings = await readLocalSettings();
   const effective = mergeBusinessWithLocalSettings(fresh, localSettings);
+
+  // Team card: everyone sees who has access; invitations are for the owner.
+  const access = await getBusinessAccess();
+  const [members, invitations] = await Promise.all([
+    listMembers(access.businessId),
+    access.isOwner ? listPendingInvitations(access.businessId) : Promise.resolve([])
+  ]);
 
   return (
     <section className="page">
@@ -80,6 +93,32 @@ export default async function SettingsPage() {
             }}
           />
         </div>
+      </article>
+
+      <article className="card" id="receipt-inbox">
+        <ReceiptInboxCard
+          locale={locale}
+          initialAddress={receiptInboxAddress(fresh.receiptInboxToken)}
+          available={isReceiptInboxConfigured()}
+        />
+      </article>
+
+      <article className="card" id="team">
+        <TeamCard
+          locale={locale}
+          role={access.role}
+          currentUserId={access.userId}
+          businessName={fresh.name}
+          initialMembers={members.map((m) => ({ ...m, since: m.since.toISOString() }))}
+          initialInvitations={invitations.map((i) => ({
+            id: i.id,
+            email: i.email,
+            role: i.role,
+            expiresAt: i.expiresAt.toISOString(),
+            expired: i.expired
+          }))}
+          emailAvailable={isEmailConfigured() || process.env.NODE_ENV !== "production"}
+        />
       </article>
 
       <article className="card" id="security">

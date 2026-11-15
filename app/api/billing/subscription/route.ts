@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAuthContext } from "@/lib/auth/context";
+import { authErrorResponse, requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
 import { PLANS, getPlan } from "@/lib/billing/stripe";
 
@@ -25,6 +25,8 @@ export async function GET() {
       hasStripeCustomer: Boolean(sub?.stripeCustomerId)
     });
   } catch (error) {
+    const denied = authErrorResponse(error);
+    if (denied) return denied;
     return NextResponse.json({ error: error instanceof Error ? error.message : "Error" }, { status: 500 });
   }
 }

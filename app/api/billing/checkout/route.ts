@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireAuthContext } from "@/lib/auth/context";
+import { authErrorResponse, requireOwner } from "@/lib/auth/context";
 import { requireBusiness } from "@/lib/data/business";
 import { stripe, getOrCreateStripeCustomer, PLANS, type PlanKey } from "@/lib/billing/stripe";
 import { prisma } from "@/lib/db";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
-    const { businessId, userId } = await requireAuthContext();
+    const { businessId, userId } = await requireOwner();
     const business = await requireBusiness(businessId);
 
     const body = await request.json();
@@ -54,6 +54,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: session.url }, { status: 201 });
   } catch (error) {
+    // Billing belongs to the owner: 401/403 instead of a generic 500.
+    const denied = authErrorResponse(error);
+    if (denied) return denied;
     return NextResponse.json({ error: error instanceof Error ? error.message : "Error" }, { status: 500 });
   }
 }

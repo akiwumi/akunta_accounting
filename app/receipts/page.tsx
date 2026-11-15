@@ -119,7 +119,7 @@ export default async function ReceiptsPage(props: ReceiptsPageProps) {
   const isAllView = searchParams?.view === "all";
   const nowYear = new Date().getUTCFullYear();
   const minReceipt = await prisma.receipt.aggregate({
-    where: { businessId: business.id },
+    where: { businessId: business.id, deletedAt: null },
     _min: { receiptDate: true, createdAt: true }
   });
   const earliest = [minReceipt._min.receiptDate, minReceipt._min.createdAt]
@@ -184,7 +184,7 @@ export default async function ReceiptsPage(props: ReceiptsPageProps) {
 
   const receipts = await prisma.receipt.findMany({
     where: {
-      businessId: business.id,
+      businessId: business.id, deletedAt: null,
       ...(whereAnd.length > 0 ? { AND: whereAnd } : {})
     },
     include: {

@@ -29,7 +29,7 @@ export const getClosedTaxYearsForBusiness = async (
       _min: { txnDate: true }
     }),
     prisma.receipt.aggregate({
-      where: { businessId },
+      where: { businessId, deletedAt: null },
       _min: { receiptDate: true, createdAt: true }
     }),
     prisma.invoice.aggregate({

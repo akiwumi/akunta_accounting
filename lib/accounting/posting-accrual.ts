@@ -8,6 +8,7 @@
  *  - A separate "settlement" posting moves the amount from AR/AP to bank when cash actually moves.
  */
 
+import { assertDateNotLocked } from "@/lib/accounting/ledger";
 import { type Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
@@ -56,6 +57,7 @@ const round4 = (v: number) => Math.round(v * 10000) / 10000;
 
 /** Post income/expense recognition without touching bank. */
 export const createAccrualTransaction = async (input: CreateAccrualTransactionInput) => {
+  await assertDateNotLocked(prisma, input.businessId, input.txnDate);
   const arAccountCode = input.counterpartyAccountCode ?? (input.direction === TransactionDirections.INCOME ? "1510" : "2440");
   const incomeAccountCode = input.incomeAccountCode ?? "3001";
   const expenseAccountCode = input.expenseAccountCode ?? "6110";
@@ -133,6 +135,7 @@ export const createAccrualTransaction = async (input: CreateAccrualTransactionIn
 
 /** Settle a receivable or payable when cash moves to/from bank. */
 export const createSettlementTransaction = async (input: SettlementInput) => {
+  await assertDateNotLocked(prisma, input.businessId, input.txnDate);
   const bankCode = input.bankAccountCode ?? "1930";
   const counterpartyCode = input.counterpartyAccountCode ?? (input.direction === TransactionDirections.INCOME ? "1510" : "2440");
 

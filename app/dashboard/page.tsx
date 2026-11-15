@@ -93,7 +93,7 @@ export default async function DashboardPage(props: DashboardPageProps) {
     }),
     prisma.receipt.count({
       where: {
-        businessId: business.id,
+        businessId: business.id, deletedAt: null,
         OR: [
           {
             receiptDate: {

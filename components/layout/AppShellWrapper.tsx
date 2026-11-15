@@ -3,12 +3,16 @@
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
+import { AccessDeniedNotice, ReadOnlyBanner } from "@/components/layout/AccessNotices";
 import { AppNav } from "@/components/layout/AppNav";
 import { PageSubNav } from "@/components/layout/PageSubNav";
+import { SessionProvider } from "@/components/layout/SessionContext";
 import { UserPreferencesProvider } from "@/components/providers/UserPreferencesProvider";
 import { type Locale } from "@/lib/i18n/locale";
 
-const AUTH_PREFIXES = ["/login", "/register", "/sign-in", "/forgot-password", "/reset-password"];
+// "/invite" is here for its layout: an invitation opens as a plain page, with
+// or without a session, never inside someone's books.
+const AUTH_PREFIXES = ["/login", "/register", "/sign-in", "/forgot-password", "/reset-password", "/invite"];
 const PUBLIC_PREFIXES = ["/blog", "/help", "/support", "/resources", "/pricing", "/welcome", "/privacy", "/terms"];
 
 const INACTIVITY_MS = 15 * 60 * 1000; // 15 minutes
@@ -79,14 +83,18 @@ export function AppShellWrapper({
   if (showAppShell) {
     return (
       <UserPreferencesProvider>
-        <div className="appShell routeFade">
-          <InactivityWatcher />
-          <AppNav locale={locale} />
-          <div className="appMain">
-            <PageSubNav locale={locale} />
-            <main className="container routeFade">{children}</main>
+        <SessionProvider>
+          <div className="appShell routeFade">
+            <InactivityWatcher />
+            <AppNav locale={locale} />
+            <div className="appMain">
+              <ReadOnlyBanner locale={locale} />
+              <PageSubNav locale={locale} />
+              <main className="container routeFade">{children}</main>
+            </div>
+            <AccessDeniedNotice locale={locale} />
           </div>
-        </div>
+        </SessionProvider>
       </UserPreferencesProvider>
     );
   }

@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireAuthContext } from "@/lib/auth/context";
-import { prisma } from "@/lib/db";
-import { createSmtpTransport, getDefaultEmailFromAddress, getSmtpConfig } from "@/lib/email/smtp";
+import { sendInvoiceEmail } from "@/lib/invoices/delivery";
+import { authOrNull, jsonError, requestText, unauthorized, zodMessage } from "@/lib/invoices/http";
 import { loadInvoiceForOutput } from "@/lib/invoices/load";
-import { buildInvoicePdf } from "@/lib/invoices/pdf";
 
-type RouteContext = {
-  params: Promise<{
-    id: string;
-  }>;
-};
+type RouteContext = { params: Promise<{ id: string }> };
 
 const sendInvoiceEmailSchema = z.object({
   to: z.string().trim().email(),
@@ -22,124 +16,31 @@ const sendInvoiceEmailSchema = z.object({
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const sanitizeFileNamePart = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9-_]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "invoice";
-
-const buildHtml = (input: { message?: string; invoiceNumber: string; amount: string }) => {
-  const safeMessage = input.message?.trim() || "";
-  const messageHtml = safeMessage
-    ? `<p style="white-space:pre-line;">${safeMessage
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")}</p>`
-    : "<p>Please find your invoice attached as a PDF.</p>";
-
-  return [
-    "<div style=\"font-family:Arial,sans-serif;color:#111827;line-height:1.5;\">",
-    messageHtml,
-    `<p><strong>Invoice:</strong> ${input.invoiceNumber}<br/><strong>Total:</strong> ${input.amount}</p>`,
-    "<p>Thank you.</p>",
-    "</div>"
-  ].join("");
-};
-
 export async function POST(request: Request, context: RouteContext) {
-  const invoiceId = (await context.params).id;
-  if (!invoiceId) {
-    return NextResponse.json({ error: "Missing invoice id." }, { status: 400 });
+  const auth = await authOrNull();
+  if (!auth) return unauthorized();
+  const t = await requestText();
+
+  const parsed = sendInvoiceEmailSchema.safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) {
+    return jsonError(t("Ange en giltig e-postadress.", "Enter a valid email address.") + ` (${zodMessage(parsed.error)})`, 422);
   }
 
-  const payload = sendInvoiceEmailSchema.parse(await request.json().catch(() => ({})));
+  const invoice = await loadInvoiceForOutput({ businessId: auth.businessId, invoiceId: (await context.params).id });
+  if (!invoice) return jsonError(t("Fakturan hittades inte.", "Invoice not found."), 404);
 
-  const { businessId } = await requireAuthContext();
-  const invoice = await loadInvoiceForOutput({
-    businessId,
-    invoiceId
-  });
-
-  if (!invoice) {
-    return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
-  }
-
-  const pdfBuffer = buildInvoicePdf({
-    invoiceNumber: invoice.invoiceNumber,
-    projectName: invoice.projectName,
-    issueDate: invoice.issueDate,
-    dueDate: invoice.dueDate,
-    currency: invoice.currency,
-    sender: {
-      name: invoice.senderName,
-      address: invoice.senderAddress,
-      registration: invoice.senderOrgNumber,
-      email: invoice.senderEmail,
-      phone: invoice.senderPhone,
-      website: invoice.senderWebsite
-    },
-    customer: {
-      name: invoice.customerName,
-      address: invoice.customerAddress,
-      email: invoice.customerEmail,
-      phone: invoice.customerPhone,
-      website: invoice.customerWebsite
-    },
-    items: invoice.items.map((item) => ({
-      description: item.description,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      vatAmount: item.vatAmount,
-      totalAmount: item.totalAmount
-    })),
-    subtotalAmount: invoice.subtotalAmount,
-    vatAmount: invoice.vatAmount,
-    grossAmount: invoice.grossAmount,
-    notes: invoice.notes,
-    paymentMethod: invoice.paymentMethod,
-    paymentDetails: invoice.paymentDetails
-  });
-
-  const formattedAmount = new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: invoice.currency
-  }).format(invoice.grossAmount);
-
-  const fromAddress = getDefaultEmailFromAddress(invoice.businessInvoiceEmailFrom?.trim());
-  const subject = payload.subject?.trim() || `Invoice ${invoice.invoiceNumber}`;
-  const filename = `invoice-${sanitizeFileNamePart(invoice.invoiceNumber)}.pdf`;
-  const html = buildHtml({
-    message: payload.message,
-    invoiceNumber: invoice.invoiceNumber,
-    amount: formattedAmount
-  });
-
-  const smtp = getSmtpConfig();
-  if (!smtp.ok) {
-    return NextResponse.json(
-      { error: "Email delivery is not configured. Set SMTP credentials." },
-      { status: 503 }
+  const result = await sendInvoiceEmail(invoice, parsed.data);
+  if (!result.ok) {
+    return jsonError(
+      result.reason === "not_configured"
+        ? t(
+            "E-post är inte konfigurerad på servern ännu. Ladda ner PDF:en och skicka den själv så länge.",
+            "Email is not set up on the server yet. Download the PDF and send it yourself for now."
+          )
+        : t(`E-postmeddelandet kunde inte skickas: ${result.message}`, `The email could not be sent: ${result.message}`),
+      result.reason === "not_configured" ? 503 : 502
     );
   }
-  const transporter = createSmtpTransport(smtp.config);
-  await transporter.sendMail({
-    from: fromAddress,
-    to: payload.to,
-    subject,
-    html,
-    attachments: [{ filename, content: pdfBuffer, contentType: "application/pdf" }]
-  });
 
-  await prisma.invoice.update({
-    where: { id: invoice.id },
-    data: {
-      sentAt: new Date(),
-      emailTo: payload.to
-    }
-  });
-
-  return NextResponse.json({
-    invoiceId: invoice.id,
-    emailedTo: payload.to
-  });
+  return NextResponse.json({ invoiceId: invoice.id, emailedTo: parsed.data.to });
 }

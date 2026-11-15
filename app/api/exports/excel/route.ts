@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { buildAccountingWorkbook } from "@/lib/accounting/excel";
-import { buildBalanceSheet, buildNeBilagaDraft, buildProfitAndLoss, buildVatReport } from "@/lib/accounting/reports";
+import { buildBalanceSheet, buildProfitAndLoss, buildVatReport } from "@/lib/accounting/reports";
+import { buildNeRows } from "@/lib/tax/neRows";
 import { asNumber } from "@/lib/accounting/math";
 import { requireAuthContext } from "@/lib/auth/context";
 import { requireBusiness } from "@/lib/data/business";
@@ -19,11 +20,11 @@ export async function GET(request: Request) {
     new URL(request.url).searchParams,
     getFiscalYearStartMonth(business.fiscalYearStart)
   );
-  const [profitAndLoss, balanceSheet, vat, neDraft] = await Promise.all([
+  const [profitAndLoss, balanceSheet, vat, neRows] = await Promise.all([
     buildProfitAndLoss({ businessId, ...period }),
     buildBalanceSheet({ businessId, ...period }),
     buildVatReport({ businessId, ...period }),
-    buildNeBilagaDraft({ businessId, ...period })
+    buildNeRows(businessId, period.to)
   ]);
 
   if (!business.taxConfig) {
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
     balanceSheet,
     vat,
     taxEstimate,
-    neDraft
+    neRows
   });
 
   return new NextResponse(workbookBuffer, {

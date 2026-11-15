@@ -57,20 +57,20 @@ export default async function LedgerPage(props: LedgerPageProps) {
           reference: "Referens",
           journal: "Verifikation",
           input: "Underlag",
-          erase: "Radera",
-          erasing: "Raderar...",
-          eraseSelected: "Radera markerade",
-          erasingSelected: "Raderar markerade...",
+          erase: "Makulera",
+          erasing: "Makulerar...",
+          eraseSelected: "Makulera markerade",
+          erasingSelected: "Makulerar markerade...",
           selectedCount: "Markerade",
           selectAll: "Markera alla",
           selectRow: "Markera rad",
-          deleteSelectedConfirm: "Radera alla markerade huvudboksposter?",
+          deleteSelectedConfirm: "Makulera alla markerade verifikationer? En rättelseverifikation bokförs för varje post och båda ligger kvar i huvudboken.",
           none: "Inga transaktioner hittades.",
           reviewReceipt: "Granska kvitto",
           reviewTransaction: "Granska post",
           reviewInput: "Granska underlag",
-          deleteConfirm: "Radera den här huvudboksposten?",
-          deleteFailed: "Kunde inte radera posten.",
+          deleteConfirm: "Makulera den här verifikationen? En rättelseverifikation bokförs och båda ligger kvar i huvudboken.",
+          deleteFailed: "Kunde inte makulera verifikationen.",
           unknownDeleteError: "Okänt fel vid radering."
         }
       : {
@@ -98,20 +98,20 @@ export default async function LedgerPage(props: LedgerPageProps) {
           reference: "Reference",
           journal: "Journal",
           input: "Input",
-          erase: "Delete",
-          erasing: "Deleting...",
-          eraseSelected: "Delete selected",
-          erasingSelected: "Deleting selected...",
+          erase: "Cancel",
+          erasing: "Cancelling...",
+          eraseSelected: "Cancel selected",
+          erasingSelected: "Cancelling selected...",
           selectedCount: "Selected",
           selectAll: "Select all",
           selectRow: "Select row",
-          deleteSelectedConfirm: "Delete all selected ledger entries?",
+          deleteSelectedConfirm: "Cancel all selected entries? A correcting entry is booked for each one and both stay in the ledger.",
           none: "No transactions found.",
           reviewReceipt: "Review receipt",
           reviewTransaction: "Review entry",
           reviewInput: "Review input",
-          deleteConfirm: "Delete this ledger entry?",
-          deleteFailed: "Failed to delete entry.",
+          deleteConfirm: "Cancel this entry? A correcting entry is booked and both stay in the ledger.",
+          deleteFailed: "Failed to cancel the entry.",
           unknownDeleteError: "Unknown delete error."
         };
 
@@ -179,6 +179,11 @@ export default async function LedgerPage(props: LedgerPageProps) {
 
   const ledgerRows = transactions.map((txn) => ({
     id: txn.id,
+    verificationNumber: txn.verificationNumber,
+    status: (txn.voidedAt ? "CANCELLED" : txn.reversesTransactionId ? "CORRECTION" : "ACTIVE") as
+      | "ACTIVE"
+      | "CANCELLED"
+      | "CORRECTION",
     txnDate: txn.txnDate.toISOString(),
     itemPurchased: (() => {
       const description = String(txn.description ?? "").trim();

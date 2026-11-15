@@ -29,6 +29,9 @@ export async function GET() {
       where: {
         businessId,
         txnDate: { gte: windowStart },
+        // Cancelled entries and their corrections never match a bank line
+        voidedAt: null,
+        reversesTransactionId: null,
         // Exclude transactions already reconciled via bank lines
         NOT: {
           id: {

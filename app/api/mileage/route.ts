@@ -7,7 +7,7 @@ import { round2 } from "@/lib/accounting/math";
 
 export const dynamic = "force-dynamic";
 
-const CURRENT_RATE_PER_KM = 1.85; // SEK per km (2026 Skatteverket rate)
+const CURRENT_RATE_PER_KM = 2.5; // SEK per km: 25 kr/mil for own car, in force since income year 2023
 
 const createSchema = z.object({
   tripDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

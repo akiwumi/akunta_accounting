@@ -7,18 +7,15 @@ import { useState } from "react";
 const FEATURES = [
   "Receipt capture with OCR",
   "Unlimited invoices & PDF export",
-  "Bank CSV import & reconciliation",
+  "Bank CSV import",
   "P&L, balance sheet, VAT report",
   "NE-bilaga & Inkomstdeklaration 1 draft",
-  "Momsdeklaration filing",
-  "Payroll & arbetsgivardeklaration",
-  "PEPPOL e-invoice delivery",
-  "Skatteverket integration",
+  "VAT summary for your momsdeklaration",
+  "Payroll with salary and expense postings",
   "Periodiseringsfond & expansionsfond",
-  "Year-end close & opening balances",
   "Audit trail",
   "Export to Excel",
-  "BankID login (coming soon)"
+  "BankID login, bank feeds and filing to Skatteverket (coming soon)"
 ];
 
 const PLANS = [

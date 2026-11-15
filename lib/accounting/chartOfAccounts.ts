@@ -19,7 +19,10 @@ export const swedishSoleTraderDefaultAccounts: AccountSeed[] = [
 
   // ── EQUITY ──────────────────────────────────────────────────────────────
   { code: "2010", name: "Eget kapital (Owner Equity)", type: AccountTypes.EQUITY, isSystem: true },
-  { code: "2013", name: "Årets resultat (Current Year Result)", type: AccountTypes.EQUITY },
+  { code: "2012", name: "Avräkning för skatter och avgifter (Owner Taxes and Charges)", type: AccountTypes.EQUITY },
+  { code: "2013", name: "Övriga egna uttag (Owner Withdrawals)", type: AccountTypes.EQUITY },
+  { code: "2018", name: "Övriga egna insättningar (Owner Deposits)", type: AccountTypes.EQUITY },
+  { code: "2019", name: "Årets resultat (Current Year Result)", type: AccountTypes.EQUITY },
   { code: "2085", name: "Expansionsfond", type: AccountTypes.EQUITY },
 
   // ── LIABILITIES ─────────────────────────────────────────────────────────
@@ -40,7 +43,7 @@ export const swedishSoleTraderDefaultAccounts: AccountSeed[] = [
   { code: "3046", name: "Försäljning 6% moms (Sales 6% VAT)", type: AccountTypes.INCOME, vatCode: "OUT_06", isSystem: true },
   { code: "3051", name: "Försäljning utan moms (Sales 0% VAT)", type: AccountTypes.INCOME },
   { code: "3590", name: "Övriga intäkter (Other Revenue)", type: AccountTypes.INCOME },
-  { code: "3740", name: "Erhållna rabatter (Discounts Received)", type: AccountTypes.INCOME },
+  { code: "3740", name: "Öres- och kronutjämning (Rounding)", type: AccountTypes.INCOME },
   { code: "3910", name: "Erhållna bidrag (Subsidies / Grants Received)", type: AccountTypes.INCOME },
   { code: "3920", name: "Försäkringsersättningar (Insurance Compensation)", type: AccountTypes.INCOME },
   { code: "3973", name: "Vinst avyttring inventarier (Gain on Disposal of Assets)", type: AccountTypes.INCOME },

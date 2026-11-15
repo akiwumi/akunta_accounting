@@ -9,6 +9,9 @@ import { type Locale } from "@/lib/i18n/locale";
 
 type LedgerTransactionRow = {
   id: string;
+  verificationNumber: number;
+  /** CANCELLED = reversed by a correcting entry. CORRECTION = the reversing entry itself. */
+  status: "ACTIVE" | "CANCELLED" | "CORRECTION";
   txnDate: string;
   itemPurchased: string;
   description: string;
@@ -68,6 +71,12 @@ export const LedgerTransactionsTable = ({ locale, rows, copy }: LedgerTransactio
   const [error, setError] = useState<string | null>(null);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const numberLocale = locale === "sv" ? "sv-SE" : "en-GB";
+  const ledgerLabels =
+    locale === "sv"
+      ? { verification: "Ver.nr", cancelled: "Makulerad", correction: "Rättelse" }
+      : { verification: "Ver. no.", cancelled: "Cancelled", correction: "Correction" };
+  // Only entries still in force can be cancelled.
+  const selectableRows = rows.filter((row) => row.status === "ACTIVE");
   const totalsCurrency = useMemo(() => {
     const currencies = Array.from(
       new Set(
@@ -104,9 +113,9 @@ export const LedgerTransactionsTable = ({ locale, rows, copy }: LedgerTransactio
 
   useEffect(() => {
     if (!selectAllRef.current) return;
-    const partiallySelected = selectedIds.size > 0 && selectedIds.size < rows.length;
+    const partiallySelected = selectedIds.size > 0 && selectedIds.size < selectableRows.length;
     selectAllRef.current.indeterminate = partiallySelected;
-  }, [selectedIds, rows.length]);
+  }, [selectedIds, selectableRows.length]);
 
   const toggleRow = (transactionId: string, checked: boolean) => {
     setSelectedIds((previous) => {
@@ -125,7 +134,7 @@ export const LedgerTransactionsTable = ({ locale, rows, copy }: LedgerTransactio
       setSelectedIds(new Set());
       return;
     }
-    setSelectedIds(new Set(rows.map((row) => row.id)));
+    setSelectedIds(new Set(selectableRows.map((row) => row.id)));
   };
 
   const onDelete = async (transactionId: string) => {
@@ -199,10 +208,11 @@ export const LedgerTransactionsTable = ({ locale, rows, copy }: LedgerTransactio
                   ref={selectAllRef}
                   type="checkbox"
                   aria-label={copy.selectAll}
-                  checked={rows.length > 0 && selectedIds.size === rows.length}
+                  checked={selectableRows.length > 0 && selectedIds.size === selectableRows.length}
                   onChange={(event) => toggleSelectAll(event.target.checked)}
                 />
               </th>
+              <th>{ledgerLabels.verification}</th>
               <th>{copy.date}</th>
               <th>{copy.itemPurchased}</th>
               <th>{copy.description}</th>
@@ -226,12 +236,24 @@ export const LedgerTransactionsTable = ({ locale, rows, copy }: LedgerTransactio
                     type="checkbox"
                     aria-label={`${copy.selectRow} ${txn.description}`}
                     checked={selectedIds.has(txn.id)}
+                    disabled={txn.status !== "ACTIVE"}
                     onChange={(event) => toggleRow(txn.id, event.target.checked)}
                   />
                 </td>
+                <td>{txn.verificationNumber}</td>
                 <td>{txn.txnDate.slice(0, 10)}</td>
                 <td>{txn.itemPurchased}</td>
-                <td>{txn.description}</td>
+                <td>
+                  {txn.description}
+                  {txn.status !== "ACTIVE" && (
+                    <>
+                      {" "}
+                      <span className="badge warn">
+                        {txn.status === "CANCELLED" ? ledgerLabels.cancelled : ledgerLabels.correction}
+                      </span>
+                    </>
+                  )}
+                </td>
                 <td>{txn.vendor ?? "-"}</td>
                 <td>{txn.direction}</td>
                 <td>{formatMoney(txn.grossAmount, txn.currency, numberLocale)}</td>
@@ -248,20 +270,22 @@ export const LedgerTransactionsTable = ({ locale, rows, copy }: LedgerTransactio
                   )}
                 </td>
                 <td>
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={deletingId === txn.id}
-                    onClick={() => onDelete(txn.id)}
-                  >
-                    {deletingId === txn.id ? copy.erasing : copy.erase}
-                  </button>
+                  {txn.status === "ACTIVE" && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={deletingId === txn.id}
+                      onClick={() => onDelete(txn.id)}
+                    >
+                      {deletingId === txn.id ? copy.erasing : copy.erase}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={14}>{copy.none}</td>
+                <td colSpan={15}>{copy.none}</td>
               </tr>
             )}
           </tbody>

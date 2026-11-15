@@ -5,7 +5,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { BusinessSwitcher } from "@/components/layout/BusinessSwitcher";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
+import { useSessionInfo } from "@/components/layout/SessionContext";
 import { type Locale } from "@/lib/i18n/locale";
 
 const links = [
@@ -14,12 +16,18 @@ const links = [
   { href: "/dashboard", icon: "DB", group: "main", labels: { en: "Dashboard", sv: "Översikt" } },
   { href: "/receipts", icon: "RC", group: "main", labels: { en: "Receipts", sv: "Kvitton" } },
   { href: "/invoices", icon: "IV", group: "main", labels: { en: "Invoices", sv: "Fakturor" } },
+  { href: "/quotes", icon: "QT", group: "main", labels: { en: "Quotes", sv: "Offerter" } },
+  { href: "/customers", icon: "CU", group: "main", labels: { en: "Customers", sv: "Kunder" } },
   { href: "/imports", icon: "BC", group: "main", labels: { en: "Bank CSV", sv: "Bank-CSV" } },
   { href: "/transactions", icon: "TX", group: "main", labels: { en: "Transactions", sv: "Transaktioner" } },
   { href: "/salaries", icon: "SL", group: "main", labels: { en: "Salaries", sv: "Löner" } },
   { href: "/ledger", icon: "LG", group: "main", labels: { en: "Ledger", sv: "Huvudbok" } },
+  { href: "/journal", icon: "JE", group: "main", labels: { en: "Journal entry", sv: "Bokför manuellt" } },
+  { href: "/accounts", icon: "CA", group: "main", labels: { en: "Chart of accounts", sv: "Kontoplan" } },
   { href: "/review", icon: "RV", group: "main", labels: { en: "Review", sv: "Granskning" } },
   // ── Swedish tax requirements ──────────────────────────────────────────
+  { href: "/vat", icon: "VT", group: "tax", labels: { en: "VAT return", sv: "Momsdeklaration" } },
+  { href: "/year-end", icon: "YE", group: "tax", labels: { en: "Year-end", sv: "Bokslut" } },
   { href: "/assets", icon: "FA", group: "tax", labels: { en: "Fixed Assets", sv: "Inventarier" } },
   { href: "/mileage", icon: "KJ", group: "tax", labels: { en: "Mileage Log", sv: "Körjournal" } },
   { href: "/periodiseringsfond", icon: "PF", group: "tax", labels: { en: "Tax Reserves", sv: "Periodiseringsfond" } },
@@ -27,6 +35,7 @@ const links = [
   { href: "/audit", icon: "AL", group: "tax", labels: { en: "Audit Trail", sv: "Revisionslogg" } },
   // ── Reports, settings & support ───────────────────────────────────────
   { href: "/reports", icon: "RP", group: "other", labels: { en: "Reports", sv: "Rapporter" } },
+  { href: "/sie", icon: "SI", group: "other", labels: { en: "Move books (SIE)", sv: "Flytta bokföring (SIE)" } },
   { href: "/settings", icon: "ST", group: "other", labels: { en: "Settings", sv: "Inställningar" } },
   { href: "/support", icon: "SP", group: "other", labels: { en: "Support", sv: "Support" } }
 ] as const;
@@ -60,6 +69,7 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
   const pathname = usePathname() || "/";
   const labels = copy[locale];
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { current } = useSessionInfo();
 
   const isActiveLink = (href: string) => {
     if (href === "/" || href === "/dashboard") return pathname === href;
@@ -79,6 +89,7 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
 
   const navLinks = (
     <>
+      <BusinessSwitcher locale={locale} />
       <div className="sideNavSections">
         {groups.map(({ key, label }) => (
           <div className="sideNavGroup" key={key}>
@@ -131,6 +142,7 @@ export const AppNav = ({ locale }: { locale: Locale }) => {
         <div className="mobileTopBarBrand">
           <Image src="/akunta_logo.png" alt="Akunta" width={28} height={28} className="mobileTopBarLogo" />
           <span className="mobileTopBarWordmark">Akunta</span>
+          {current ? <span className="note">{current.name}</span> : null}
         </div>
         <button
           type="button"

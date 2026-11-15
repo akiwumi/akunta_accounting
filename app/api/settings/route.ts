@@ -11,6 +11,12 @@ import {
   writeLocalSettings
 } from "@/lib/data/localSettings";
 import { sanitizeInvoiceNumberPattern } from "@/lib/invoices/numbering";
+import {
+  type PaymentAccountField,
+  parsePaymentAccount,
+  paymentAccountMessage
+} from "@/lib/invoices/payment-accounts";
+import { getRequestLocale } from "@/lib/i18n/locale";
 
 const updateSchema = z.object({
   name: z.string().min(2).max(120),
@@ -37,6 +43,17 @@ const updateSchema = z.object({
   invoiceEmailFrom: z.string().trim().email().max(120).optional().or(z.literal("")),
   invoiceDefaultLogo: z.string().trim().max(1_500_000).optional(),
   invoiceDefaultSignature: z.string().trim().max(1_500_000).optional(),
+  // How customers pay, payment terms, quotes and reminders. All optional, so
+  // a client that does not send them leaves the stored values untouched.
+  bankgiro: z.string().trim().max(20).optional(),
+  plusgiro: z.string().trim().max(20).optional(),
+  iban: z.string().trim().max(42).optional(),
+  bic: z.string().trim().max(14).optional(),
+  swishNumber: z.string().trim().max(20).optional(),
+  defaultPaymentTermsDays: z.number().int().min(0).max(120).optional(),
+  quoteNumberPattern: z.string().trim().min(1).max(80).optional(),
+  invoiceReminderEnabled: z.boolean().optional(),
+  invoiceReminderDaysAfterDue: z.number().int().min(1).max(60).optional(),
   // Tax rates
   municipalTaxRate: z.number().min(0).max(1),
   socialContributionRate: z.number().min(0).max(1),
@@ -72,10 +89,38 @@ export async function PUT(request: Request) {
     try {
       payload = updateSchema.parse(body);
     } catch (err) {
+      const issue = err instanceof z.ZodError ? err.issues[0] : undefined;
       return NextResponse.json(
-        { error: err instanceof Error ? err.message : "Validation error" },
+        {
+          error: issue
+            ? `${issue.path.join(".")}: ${issue.message}`
+            : err instanceof Error
+              ? err.message
+              : "Validation error"
+        },
         { status: 422 }
       );
+    }
+
+    // Payment accounts: check digits are verified here so a typo never reaches an invoice.
+    const locale = await getRequestLocale();
+    const paymentAccounts: Partial<Record<PaymentAccountField, string | null>> = {};
+    const accountFields: PaymentAccountField[] = ["bankgiro", "plusgiro", "iban", "bic", "swishNumber"];
+    for (const field of accountFields) {
+      const raw = payload[field];
+      if (raw === undefined) continue;
+      if (raw === "") {
+        paymentAccounts[field] = null;
+        continue;
+      }
+      const result = parsePaymentAccount(field, raw);
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: paymentAccountMessage(field, result.reason, locale), field },
+          { status: 422 }
+        );
+      }
+      paymentAccounts[field] = result.value;
     }
 
     const localPayload: LocalBusinessSettings = {
@@ -142,6 +187,13 @@ export async function PUT(request: Request) {
           invoiceEmailFrom: payload.invoiceEmailFrom?.trim() || null,
           invoiceDefaultLogo: payload.invoiceDefaultLogo?.trim() || null,
           invoiceDefaultSignature: payload.invoiceDefaultSignature?.trim() || null,
+          ...paymentAccounts,
+          defaultPaymentTermsDays: payload.defaultPaymentTermsDays,
+          quoteNumberPattern: payload.quoteNumberPattern
+            ? sanitizeInvoiceNumberPattern(payload.quoteNumberPattern)
+            : undefined,
+          invoiceReminderEnabled: payload.invoiceReminderEnabled,
+          invoiceReminderDaysAfterDue: payload.invoiceReminderDaysAfterDue,
           taxConfig: {
             upsert: {
               create: {

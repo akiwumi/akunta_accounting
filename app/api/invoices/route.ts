@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { asNumber } from "@/lib/accounting/math";
-import { computeInvoiceTotals } from "@/lib/invoices/calculations";
 import { requireAuthContext } from "@/lib/auth/context";
 import { prisma } from "@/lib/db";
-import { formatInvoiceNumber } from "@/lib/invoices/numbering";
+import { invoiceAmounts, invoiceBalanceInclude } from "@/lib/invoices/balance";
+import { createInvoiceRecord, InvoiceInputError } from "@/lib/invoices/create";
+import { documentCustomerSchema, upsertDocumentCustomer } from "@/lib/invoices/customers";
+import { parseIsoDate, stockholmToday } from "@/lib/invoices/dates";
+import { requestText, rotRutErrorResponse } from "@/lib/invoices/http";
+import { computeInvoiceStatus } from "@/lib/invoices/status";
 import { InvoiceVatModes } from "@/lib/invoices/types";
 
 const invoiceItemSchema = z.object({
@@ -13,20 +17,23 @@ const invoiceItemSchema = z.object({
   quantity: z.number().positive(),
   unitPrice: z.number().min(0),
   vatMode: z.enum([InvoiceVatModes.NO_VAT, InvoiceVatModes.INCLUSIVE, InvoiceVatModes.EXCLUSIVE]),
-  vatRate: z.number().min(0).max(1).default(0)
+  vatRate: z.number().min(0).max(1).default(0),
+  // ROT/RUT invoices only.
+  rotRutLabour: z.boolean().optional(),
+  rotRutWorkType: z.string().trim().max(40).nullable().optional(),
+  rotRutHours: z.number().min(0).max(9999).nullable().optional()
 });
 
-const customerSchema = z.object({
-  id: z.string().trim().min(1).optional(),
-  name: z.string().trim().min(1).max(120),
-  email: z.string().trim().email().max(120).optional().or(z.literal("")),
-  phone: z.string().trim().max(80).optional(),
-  website: z.string().trim().max(120).optional(),
-  addressLine1: z.string().trim().max(180).optional(),
-  addressLine2: z.string().trim().max(180).optional(),
-  city: z.string().trim().max(80).optional(),
-  postalCode: z.string().trim().max(40).optional(),
-  country: z.string().trim().max(80).optional()
+/** The customer gets ROT or RUT: the type and the buyer's details. Checked in lib/invoices/rotrut.ts. */
+const rotRutSchema = z.object({
+  type: z.enum(["ROT", "RUT"]),
+  personnummer: z.string().trim().max(20),
+  housing: z.enum(["property", "apartment"]).optional(),
+  propertyDesignation: z.string().trim().max(80).optional(),
+  brfOrgNumber: z.string().trim().max(20).optional(),
+  apartmentNumber: z.string().trim().max(40).optional(),
+  subcontractor: z.boolean().optional(),
+  staffingAgency: z.boolean().optional()
 });
 
 const senderSchema = z.object({
@@ -41,7 +48,7 @@ const senderSchema = z.object({
 const createInvoiceSchema = z.object({
   invoiceNumber: z.string().trim().min(1).max(60).optional(),
   projectName: z.string().trim().max(180).optional(),
-  customer: customerSchema,
+  customer: documentCustomerSchema,
   sender: senderSchema.optional(),
   description: z.string().trim().max(240).optional(),
   notes: z.string().trim().max(2000).optional(),
@@ -54,11 +61,82 @@ const createInvoiceSchema = z.object({
 }).extend({
   emailTo: z.string().trim().email().max(120).optional().or(z.literal("")),
   logoDataUrl: z.string().trim().max(1_500_000).optional(),
-  signatureDataUrl: z.string().trim().max(1_500_000).optional()
+  signatureDataUrl: z.string().trim().max(1_500_000).optional(),
+  rotRut: rotRutSchema.optional()
 });
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
+  let businessId: string;
+  try {
+    ({ businessId } = await requireAuthContext());
+  } catch {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const query = searchParams.get("q")?.trim() ?? "";
+  const customerId = searchParams.get("customerId")?.trim() || undefined;
+  const limitRaw = Number(searchParams.get("limit") ?? "100");
+  const limit = Number.isFinite(limitRaw) ? Math.min(500, Math.max(1, Math.trunc(limitRaw))) : 100;
+  const today = stockholmToday();
+
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      businessId,
+      ...(customerId ? { customerId } : {}),
+      ...(query
+        ? {
+            OR: [
+              { invoiceNumber: { contains: query, mode: "insensitive" } },
+              { customerName: { contains: query, mode: "insensitive" } },
+              { ocrReference: { contains: query } }
+            ]
+          }
+        : {})
+    },
+    include: invoiceBalanceInclude,
+    orderBy: [{ issueDate: "desc" }, { createdAt: "desc" }],
+    take: limit
+  });
+
+  return NextResponse.json({
+    invoices: invoices.map((invoice) => {
+      const amounts = invoiceAmounts(invoice);
+      const status = computeInvoiceStatus({
+        status: invoice.status,
+        ...amounts,
+        dueDate: invoice.dueDate,
+        sentAt: invoice.sentAt,
+        today
+      });
+      return {
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        ocrReference: invoice.ocrReference,
+        customerId: invoice.customerId,
+        customerName: invoice.customerName,
+        issueDate: invoice.issueDate,
+        dueDate: invoice.dueDate,
+        currency: invoice.currency,
+        grossAmount: amounts.grossAmount,
+        paidAmount: amounts.paidAmount,
+        creditedAmount: amounts.creditedAmount,
+        remainingAmount: status.remaining,
+        rotRutType: invoice.rotRutType,
+        skatteverketAmount: amounts.skatteverketAmount,
+        status: status.kind,
+        overdue: status.overdue,
+        days: status.days,
+        sentAt: invoice.sentAt,
+        reminderCount: invoice.reminderCount,
+        lastReminderAt: invoice.lastReminderAt
+      };
+    })
+  });
+}
 
 export async function POST(request: Request) {
   let businessId: string;
@@ -68,186 +146,64 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const payload = createInvoiceSchema.parse(await request.json());
+  const parsed = createInvoiceSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    // Never echo what was typed for the ROT/RUT buyer: it is a personnummer.
+    return NextResponse.json(
+      { error: issue ? `${issue.path.join(".")}: ${issue.message}` : "Invalid invoice." },
+      { status: 422 }
+    );
+  }
+  const payload = parsed.data;
 
-  const issueDate = new Date(`${payload.issueDate}T00:00:00.000Z`);
-  if (Number.isNaN(issueDate.valueOf())) {
+  const issueDate = parseIsoDate(payload.issueDate);
+  if (!issueDate) {
     return NextResponse.json({ error: "Invalid issue date." }, { status: 400 });
   }
 
-  const dueDate = payload.dueDate ? new Date(`${payload.dueDate}T00:00:00.000Z`) : null;
-  if (dueDate && Number.isNaN(dueDate.valueOf())) {
+  // No due date sent: createInvoiceRecord applies the business payment terms.
+  const dueDate = payload.dueDate ? parseIsoDate(payload.dueDate) : null;
+  if (payload.dueDate && !dueDate) {
     return NextResponse.json({ error: "Invalid due date." }, { status: 400 });
   }
-
-  const computed = computeInvoiceTotals(payload.items);
-  if (computed.items.length === 0 || computed.grossAmount <= 0) {
-    return NextResponse.json({ error: "Invoice must include at least one valid line item." }, { status: 400 });
+  if (dueDate && dueDate < issueDate) {
+    return NextResponse.json({ error: "The due date cannot be before the invoice date." }, { status: 400 });
   }
-
-  const customerAddress = [
-    payload.customer.addressLine1?.trim(),
-    payload.customer.addressLine2?.trim(),
-    payload.customer.postalCode?.trim(),
-    payload.customer.city?.trim(),
-    payload.customer.country?.trim()
-  ]
-    .filter(Boolean)
-    .join(", ");
 
   try {
     const invoice = await prisma.$transaction(async (tx) => {
-      const freshBusiness = await tx.business.findUnique({
-        where: { id: businessId },
-        select: {
-          id: true,
-          name: true,
-          invoiceNumberPattern: true,
-          nextInvoiceSequence: true,
-          invoiceSenderName: true,
-          invoiceSenderAddress: true,
-          invoiceSenderOrgNumber: true,
-          invoiceSenderEmail: true,
-          invoiceSenderPhone: true,
-          invoiceSenderWebsite: true,
-          invoiceDefaultLogo: true,
-          invoiceDefaultSignature: true
-        }
+      const customer = await upsertDocumentCustomer(tx, businessId, payload.customer);
+
+      return createInvoiceRecord(tx, {
+        businessId,
+        customerId: customer.id,
+        customer,
+        items: payload.items,
+        issueDate,
+        dueDate,
+        currency: payload.currency,
+        invoiceNumber: payload.invoiceNumber,
+        projectName: payload.projectName,
+        description: payload.description,
+        notes: payload.notes,
+        paymentMethod: payload.paymentMethod,
+        paymentDetails: payload.paymentDetails,
+        sender: payload.sender,
+        logoDataUrl: payload.logoDataUrl,
+        signatureDataUrl: payload.signatureDataUrl,
+        emailTo: payload.emailTo || customer.email,
+        rotRut: payload.rotRut
       });
-
-      if (!freshBusiness) {
-        throw new Error("Business not found.");
-      }
-
-      const normalizedEmail = payload.customer.email?.trim() || null;
-      const customerRecord = payload.customer.id
-        ? await tx.customer.findFirst({
-            where: {
-              id: payload.customer.id,
-              businessId: businessId
-            },
-            select: { id: true }
-          })
-        : normalizedEmail
-          ? await tx.customer.findFirst({
-              where: {
-                businessId: businessId,
-                email: normalizedEmail
-              },
-              select: { id: true }
-            })
-          : await tx.customer.findFirst({
-              where: {
-                businessId: businessId,
-                name: payload.customer.name.trim()
-              },
-              select: { id: true }
-            });
-
-      const customerData = {
-        name: payload.customer.name.trim(),
-        email: normalizedEmail,
-        phone: payload.customer.phone?.trim() || null,
-        website: payload.customer.website?.trim() || null,
-        addressLine1: payload.customer.addressLine1?.trim() || null,
-        addressLine2: payload.customer.addressLine2?.trim() || null,
-        city: payload.customer.city?.trim() || null,
-        postalCode: payload.customer.postalCode?.trim() || null,
-        country: payload.customer.country?.trim() || null
-      };
-
-      const customer = customerRecord
-        ? await tx.customer.update({
-            where: { id: customerRecord.id },
-            data: customerData,
-            select: { id: true }
-          })
-        : await tx.customer.create({
-            data: {
-              businessId: businessId,
-              ...customerData
-            },
-            select: { id: true }
-          });
-
-      const customNumber = payload.invoiceNumber?.trim();
-      const invoiceNumber =
-        customNumber && customNumber.length > 0
-          ? customNumber
-          : formatInvoiceNumber({
-              pattern: freshBusiness.invoiceNumberPattern,
-              sequence: freshBusiness.nextInvoiceSequence,
-              issueDate
-            });
-
-      const sender = payload.sender ?? {};
-      const created = await tx.invoice.create({
-        data: {
-          businessId: businessId,
-          customerId: customer.id,
-          invoiceNumber,
-          customerName: payload.customer.name.trim(),
-          customerEmail: normalizedEmail,
-          customerPhone: payload.customer.phone?.trim() || null,
-          customerWebsite: payload.customer.website?.trim() || null,
-          customerAddress: customerAddress || null,
-          senderName: sender.name?.trim() || freshBusiness.invoiceSenderName || freshBusiness.name,
-          senderAddress: sender.address?.trim() || freshBusiness.invoiceSenderAddress || null,
-          senderOrgNumber: sender.registration?.trim() || freshBusiness.invoiceSenderOrgNumber || null,
-          senderEmail: sender.email?.trim() || freshBusiness.invoiceSenderEmail || null,
-          senderPhone: sender.phone?.trim() || freshBusiness.invoiceSenderPhone || null,
-          senderWebsite: sender.website?.trim() || freshBusiness.invoiceSenderWebsite || null,
-          projectName: payload.projectName?.trim() || null,
-          description: payload.description?.trim() || null,
-          notes: payload.notes?.trim() || null,
-          paymentMethod: payload.paymentMethod?.trim() || null,
-          paymentDetails: payload.paymentDetails?.trim() || null,
-          logoDataUrl: payload.logoDataUrl?.trim() || freshBusiness.invoiceDefaultLogo || null,
-          signatureDataUrl:
-            payload.signatureDataUrl?.trim() || freshBusiness.invoiceDefaultSignature || null,
-          subtotalAmount: computed.subtotal,
-          vatAmount: computed.vatAmount,
-          grossAmount: computed.grossAmount,
-          vatRate: computed.vatRate,
-          issueDate,
-          dueDate,
-          currency: payload.currency,
-          status: "UNPAID",
-          emailTo: payload.emailTo?.trim() || null,
-          items: {
-            create: computed.items.map((item, index) => ({
-              sortOrder: index,
-              description: item.description,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              vatMode: item.vatMode,
-              vatRate: item.vatRate,
-              netAmount: item.netAmount,
-              vatAmount: item.vatAmount,
-              totalAmount: item.totalAmount
-            }))
-          }
-        },
-        include: {
-          items: true
-        }
-      });
-
-      if (!customNumber) {
-        await tx.business.update({
-          where: { id: businessId },
-          data: { nextInvoiceSequence: { increment: 1 } }
-        });
-      }
-
-      return created;
     });
 
     return NextResponse.json({
       invoice: {
         id: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
+        ocrReference: invoice.ocrReference,
         customerName: invoice.customerName,
+        customerEmail: invoice.customerEmail,
         issueDate: invoice.issueDate,
         dueDate: invoice.dueDate,
         subtotalAmount: asNumber(invoice.subtotalAmount),
@@ -256,6 +212,8 @@ export async function POST(request: Request) {
         vatRate: asNumber(invoice.vatRate),
         currency: invoice.currency,
         status: invoice.status,
+        rotRutType: invoice.rotRutType,
+        rotRutDeduction: invoice.rotRutDeduction === null ? null : asNumber(invoice.rotRutDeduction),
         items: invoice.items.map((item) => ({
           id: item.id,
           description: item.description,
@@ -270,6 +228,11 @@ export async function POST(request: Request) {
       }
     });
   } catch (error) {
+    if (error instanceof InvoiceInputError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    const rotRutProblem = rotRutErrorResponse(error, await requestText());
+    if (rotRutProblem) return rotRutProblem;
     if (error instanceof Error && error.message.includes("Unique constraint")) {
       return NextResponse.json({ error: "Invoice number already exists." }, { status: 409 });
     }

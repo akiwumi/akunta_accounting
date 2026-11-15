@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 
+import { ACTIVE_TRANSACTION, voidTransaction } from "@/lib/accounting/ledger";
 import { createCashMethodTransaction } from "@/lib/accounting/posting";
 import { asNumber, round2 } from "@/lib/accounting/math";
 import { prisma } from "@/lib/db";
@@ -12,6 +13,7 @@ const round4 = (value: number) => Math.round(value * 10000) / 10000;
 
 const run = async () => {
   const receipts = await prisma.receipt.findMany({
+    where: { deletedAt: null },
     include: {
       business: {
         include: {
@@ -19,6 +21,8 @@ const run = async () => {
         }
       },
       transactions: {
+        // Entries still in force only; cancelled entries and corrections are history.
+        where: ACTIVE_TRANSACTION,
         select: {
           id: true,
           txnDate: true,
@@ -184,20 +188,40 @@ const run = async () => {
             (postingNetAmount !== null && Math.abs(txNet - postingNetAmount) > 0.01) ||
             (postingVatAmount !== null && Math.abs(txVat - postingVatAmount) > 0.01) ||
             (vatRate !== null && Math.abs(txVatRate - vatRate) > 0.0001) ||
-            (desiredReference !== null && transaction.reference !== desiredReference) ||
-            transaction.description !== desiredDescription ||
             (desiredTxnDateIso !== null && txDateIso !== desiredTxnDateIso)
           );
         });
 
       if (shouldRebuildTransactions) {
-        const removed = await prisma.transaction.deleteMany({
-          where: { receiptId: receipt.id }
+        // A booked entry is never deleted: each one is cancelled by a correcting entry.
+        await prisma.$transaction(async (tx) => {
+          for (const transaction of receipt.transactions) {
+            await voidTransaction(tx, {
+              businessId: receipt.businessId,
+              transactionId: transaction.id,
+              reason: "Receipt re-extracted"
+            });
+          }
         });
-        rebuiltTransactions += removed.count;
+        rebuiltTransactions += receipt.transactions.length;
+      } else {
+        // Text is not part of the booked amounts and may be corrected in place.
+        for (const transaction of receipt.transactions) {
+          if (
+            transaction.description !== desiredDescription ||
+            (desiredReference !== null && transaction.reference !== desiredReference)
+          ) {
+            await prisma.transaction.update({
+              where: { id: transaction.id },
+              data: { description: desiredDescription, ...(desiredReference !== null ? { reference: desiredReference } : {}) }
+            });
+          }
+        }
       }
 
-      if ((receipt.transactions.length === 0 || shouldRebuildTransactions) && hasPostableAmounts) {
+      // An unreviewed receipt is booked on approval, not here.
+      const reviewed = !receipt.needsReview || extracted.needsReview === false;
+      if (shouldRebuildTransactions || (receipt.transactions.length === 0 && reviewed && hasPostableAmounts)) {
         if (postingGrossAmount === null) continue;
         const firstTxnDate = receipt.transactions[0]?.txnDate;
         const postDate = issueDate
